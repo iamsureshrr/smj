@@ -1,92 +1,395 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Earrings & Necklace Shop</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
-    header { background: #6a1b9a; color: white; padding: 15px; text-align: center; }
-    nav a { color: white; margin: 0 10px; text-decoration: none; }
-    .hero { background: #f3e5f5; padding: 40px; text-align: center; }
-    .products { display: flex; flex-wrap: wrap; justify-content: center; padding: 20px; }
-    .product { border: 1px solid #ddd; margin: 10px; padding: 15px; width: 220px; text-align: center; }
-    .product img { width: 100%; height: auto; }
-    button { background: #6a1b9a; color: white; border: none; padding: 10px; cursor: pointer; }
-    button:hover { background: #4a148c; }
-    .cart { background: #f4f4f4; padding: 20px; }
-    footer { background: #333; color: white; text-align: center; padding: 10px; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Earnings Sale</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --success: #22c55e;
+            --dark: #1e293b;
+            --light: #f8fafc;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--light);
+        }
+        header {
+            background-color: var(--dark);
+            color: white;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            text-decoration: none;
+            text-align: center;
+        }
+        .btn-whatsapp { background-color: var(--success); }
+        .btn-secondary { background-color: #64748b; }
+        .btn-danger { background-color: #dc2626; }
+        
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+        
+        /* Admin Panel */
+        #admin-panel {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+            display: none;
+        }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; margin-bottom: 0.5rem; font-weight: bold; }
+        .form-group input, .form-group select {
+            width: 100%; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; box-sizing: border-box;
+        }
+
+        /* Product Grid & Card */
+        .products-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 2rem;
+        }
+        .product-card {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+        }
+        .img-container {
+            position: relative;
+            width: 100%;
+            height: 220px;
+            cursor: pointer;
+            overflow: hidden;
+        }
+        .product-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            background-color: #e2e8f0;
+            transition: transform 0.3s ease;
+        }
+        .img-container:hover .product-img {
+            transform: scale(1.05);
+        }
+
+        /* Full Image Overlay for Statuses */
+        .status-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5); /* 50% Transparency */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 1.8rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            pointer-events: none; /* Allows clicks to pass through to the container */
+        }
+
+        .product-info {
+            padding: 1.2rem;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .product-code {
+            font-size: 0.8rem;
+            color: #64748b;
+            text-transform: uppercase;
+            margin-bottom: 0.25rem;
+        }
+        .product-title { font-size: 1.2rem; margin: 0 0 0.5rem 0; }
+        .product-price { font-size: 1.3rem; color: var(--dark); font-weight: bold; margin-bottom: 1rem; }
+        
+        .action-buttons {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        .action-buttons .btn { flex: 1; font-size: 0.9rem; }
+
+        .admin-actions {
+            margin-top: 1rem;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 0.5rem;
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        /* Image Lightbox Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.85);
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            max-width: 90%;
+            max-height: 85%;
+            border-radius: 4px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        .modal-close {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            color: white;
+            font-size: 40px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+    </style>
 </head>
 <body>
-  <header>
-    <h1>Shine Jewelry</h1>
-    <nav>
-      <a href="#">Home</a>
-      <a href="#">Shop</a>
-      <a href="#">Cart</a>
-      <a href="#">Contact</a>
-    </nav>
-  </header>
 
-  <section class="hero">
-    <h2>Elegant Earrings & Necklaces</h2>
-    <p>Discover timeless designs for every occasion.</p>
-  </section>
+    <header>
+        <h1>Earnings Sale</h1>
+        <button id="login-btn" class="btn" onclick="toggleLogin()">Admin Login</button>
+    </header>
 
-  <section class="products">
-    <div class="product">
-      <img src="earring1.jpg" alt="Gold Earrings">
-      <h3>Gold Earrings</h3>
-      <p>₹2500</p>
-      <button onclick="addToCart('Gold Earrings', 2500)">Add to Cart</button>
+    <div class="container">
+        <div id="admin-panel">
+            <h2 id="form-title">Admin Dashboard - Add Product</h2>
+            <form id="product-form" onsubmit="saveProduct(event)">
+                <input type="hidden" id="product-id">
+                <div class="form-group">
+                    <label>Product Code (Auto-generated if left blank)</label>
+                    <input type="text" id="prod-code" placeholder="e.g., PROD-01">
+                </div>
+                <div class="form-group">
+                    <label>Product Name</label>
+                    <input type="text" id="prod-name" required>
+                </div>
+                <div class="form-group">
+                    <label>Price</label>
+                    <input type="text" id="prod-price" placeholder="e.g., ₹500" required>
+                </div>
+                <div class="form-group">
+                    <label>Image Source</label>
+                    <input type="text" id="prod-img" placeholder="Paste Image web URL here" required>
+                    <input type="file" id="prod-file" accept="image/*" onchange="handleImageUpload(event)" style="margin-top: 5px;">
+                </div>
+                <div class="form-group">
+                    <label>Status</label>
+                    <select id="prod-status">
+                        <option value="In Stock">In Stock</option>
+                        <option value="Out of Stock">Out of Stock</option>
+                        <option value="Sold">Sold</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn">Save Product</button>
+                <button type="button" class="btn btn-secondary" onclick="clearForm()">Cancel</button>
+            </form>
+        </div>
+
+        <h2>Available Products</h2>
+        <div class="products-grid" id="products-container"></div>
     </div>
 
-    <div class="product">
-      <img src="necklace1.jpg" alt="Pearl Necklace">
-      <h3>Pearl Necklace</h3>
-      <p>₹4000</p>
-      <button onclick="addToCart('Pearl Necklace', 4000)">Add to Cart</button>
+    <div id="imageModal" class="modal" onclick="closeLightbox()">
+        <span class="modal-close" onclick="closeLightbox()">&times;</span>
+        <img class="modal-content" id="modalImg">
     </div>
 
-    <div class="product">
-      <img src="earring2.jpg" alt="Silver Earrings">
-      <h3>Silver Earrings</h3>
-      <p>₹1800</p>
-      <button onclick="addToCart('Silver Earrings', 1800)">Add to Cart</button>
-    </div>
-  </section>
+    <script>
+        // Setup base data structures
+        const defaultProducts = [
+            { id: 1710000001, code: "ITEM-01", name: "Sample Leather Wallet", price: "₹499", img: "https://images.unsplash.com/photo-1627123424574-724758594e93?w=600", status: "In Stock" },
+            { id: 1710000002, code: "ITEM-02", name: "Wireless Bluetooth Speaker", price: "₹1,250", img: "https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=600", status: "Sold" },
+            { id: 1710000003, code: "ITEM-03", name: "Minimalist Wrist Watch", price: "₹2,100", img: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600", status: "Out of Stock" }
+        ];
 
-  <section class="cart">
-    <h2>Your Cart</h2>
-    <ul id="cart-items"></ul>
-    <p id="total">Total: ₹0</p>
-  </section>
+        let products = JSON.parse(localStorage.getItem('sale_products')) || defaultProducts;
+        let isAdmin = false;
+        let uploadedImageBase64 = "";
+        const WHATSAPP_NUMBER = "918778096977"; // Standard Indian international format
 
-  <footer>
-    <p>&copy; 2026 Shine Jewelry</p>
-  </footer>
+        // Render Page Items
+        function renderProducts() {
+            const container = document.getElementById('products-container');
+            container.innerHTML = '';
 
-  <script>
-    let cart = [];
-    let total = 0;
+            products.forEach(product => {
+                let overlayHTML = '';
+                // If Sold or Out of Stock, block the image view with a 50% opacity text overlay
+                if (product.status === "Sold") {
+                    overlayHTML = `<div class="status-overlay" style="background-color: rgba(220,38,38,0.5)">Sold</div>`;
+                } else if (product.status === "Out of Stock") {
+                    overlayHTML = `<div class="status-overlay" style="background-color: rgba(234,88,12,0.5)">Out of Stock</div>`;
+                }
 
-    function addToCart(item, price) {
-      cart.push({ item, price });
-      total += price;
-      updateCart();
-    }
+                // Generate Custom encoded WhatsApp link text
+                const waMessage = encodeURIComponent(`Hi, I am interested in this product:\nCode: ${product.code}\nName: ${product.name}\nPrice: ${product.price}`);
+                const waLink = `https://wa.me/${WHATSAPP_NUMBER}?text=${waMessage}`;
 
-    function updateCart() {
-      const cartItems = document.getElementById("cart-items");
-      cartItems.innerHTML = "";
-      cart.forEach(c => {
-        const li = document.createElement("li");
-        li.textContent = `${c.item} - ₹${c.price}`;
-        cartItems.appendChild(li);
-      });
-      document.getElementById("total").textContent = `Total: ₹${total}`;
-    }
-  </script>
+                let adminButtons = '';
+                if (isAdmin) {
+                    adminButtons = `
+                        <div class="admin-actions">
+                            <button class="btn btn-secondary" onclick="editProduct(${product.id})">Edit</button>
+                            <button class="btn btn-danger" onclick="deleteProduct(${product.id})">Delete</button>
+                        </div>
+                    `;
+                }
+
+                container.innerHTML += `
+                    <div class="product-card">
+                        <div class="img-container" onclick="openLightbox('${product.img}')">
+                            <img src="${product.img}" class="product-img" alt="${product.name}">
+                            ${overlayHTML}
+                        </div>
+                        <div class="product-info">
+                            <div>
+                                <div class="product-code">Code: ${product.code}</div>
+                                <h3 class="product-title">${product.name}</h3>
+                                <div class="product-price">${product.price}</div>
+                            </div>
+                            <div>
+                                <div class="action-buttons">
+                                    <button class="btn btn-secondary" onclick="alert('Added to local cart temporary feature')">Add to Cart</button>
+                                    <a href="${waLink}" target="_blank" class="btn btn-whatsapp">Buy Now</a>
+                                </div>
+                                ${adminButtons}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        // Lightbox Logic
+        function openLightbox(imgSrc) {
+            document.getElementById('modalImg').src = imgSrc;
+            document.getElementById('imageModal').style.display = "flex";
+        }
+        function closeLightbox() {
+            document.getElementById('imageModal').style.display = "none";
+        }
+
+        // Login authentication prompt
+        function toggleLogin() {
+            if (isAdmin) {
+                isAdmin = false;
+                document.getElementById('login-btn').innerText = "Admin Login";
+                document.getElementById('admin-panel').style.display = "none";
+            } else {
+                const user = prompt("Enter Username:");
+                const pass = prompt("Enter Password:");
+
+                if (user === "admin" && pass === "admin") {
+                    isAdmin = true;
+                    document.getElementById('login-btn').innerText = "Logout";
+                    document.getElementById('admin-panel').style.display = "block";
+                } else {
+                    alert("Invalid Credentials!");
+                }
+            }
+            renderProducts();
+        }
+
+        // Handle structural base64 image data parsing
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            const reader = new FileReader();
+            reader.onloadend = function() {
+                uploadedImageBase64 = reader.result;
+                document.getElementById('prod-img').value = "Local Image Loaded";
+            }
+            if (file) reader.readAsDataURL(file);
+        }
+
+        // Save entry additions or adjustments
+        function saveProduct(e) {
+            e.preventDefault();
+            const id = document.getElementById('product-id').value;
+            const name = document.getElementById('prod-name').value;
+            const price = document.getElementById('prod-price').value;
+            let code = document.getElementById('prod-code').value.trim();
+            let img = document.getElementById('prod-img').value;
+            const status = document.getElementById('prod-status').value;
+
+            if (img === "Local Image Loaded") {
+                img = uploadedImageBase64;
+            }
+            if (!code) {
+                code = "PRD-" + Math.floor(1000 + Math.random() * 9000);
+            }
+
+            if (id) {
+                const index = products.findIndex(p => p.id == id);
+                products[index] = { id: parseInt(id), code, name, price, img, status };
+            } else {
+                const newProd = { id: Date.now(), code, name, price, img, status };
+                products.push(newProd);
+            }
+
+            localStorage.setItem('sale_products', JSON.stringify(products));
+            renderProducts();
+            clearForm();
+        }
+
+        function editProduct(id) {
+            const prod = products.find(p => p.id == id);
+            document.getElementById('product-id').value = prod.id;
+            document.getElementById('prod-code').value = prod.code;
+            document.getElementById('prod-name').value = prod.name;
+            document.getElementById('prod-price').value = prod.price;
+            document.getElementById('prod-img').value = prod.img;
+            document.getElementById('prod-status').value = prod.status;
+            document.getElementById('form-title').innerText = "Admin Dashboard - Editing " + prod.code;
+            window.scrollTo({top: 0, behavior: 'smooth'});
+        }
+
+        function deleteProduct(id) {
+            if(confirm("Are you sure you want to delete this product?")) {
+                products = products.filter(p => p.id != id);
+                localStorage.setItem('sale_products', JSON.stringify(products));
+                renderProducts();
+            }
+        }
+
+        function clearForm() {
+            document.getElementById('product-form').reset();
+            document.getElementById('product-id').value = "";
+            document.getElementById('form-title').innerText = "Admin Dashboard - Add Product";
+            uploadedImageBase64 = "";
+        }
+
+        // Execute render on structural deployment initialization
+        renderProducts();
+    </script>
 </body>
 </html>
