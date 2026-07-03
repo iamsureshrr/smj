@@ -43,26 +43,45 @@ database.ref('products').on('value', (snapshot) => {
             products.push({ dbKey: key, ...data[key] });
         });
     }
-    // Reset chunk boundaries on live updates
     displayLimit = 4;
     filterStore();
 }, (error) => {
     console.error(error);
 });
 
-// Clean up broken base64 formats safely
+// Clean up and safely split images without c*****g base64 tags
 function sanitizeImageString(imgStr) {
     const fallbackPlaceholder = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='none' stroke='%23cbd5e1' stroke-width='2'><rect x='3' y='3' width='18' height='18' rx='2'/><circle cx='8.5' cy='8.5' r='1.5'/><path d='M21 15l-5-5L5 21'/></svg>";
-    if (!imgStr || imgStr === "Local Image Loaded") return [fallbackPlaceholder];
+    if (!imgStr || imgStr === "Local Image Loaded" || String(imgStr).trim() === "") {
+        return [fallbackPlaceholder];
+    }
     
-    return imgStr.split(',').map(item => {
+    // Support both old commas and our safe new pipe character '|'
+    let rawArray = [];
+    if (String(imgStr).includes('|')) {
+        rawArray = String(imgStr).split('|');
+    } else {
+        // If old data format has multiple data URLs separated by comma
+        if (String(imgStr).includes('data:image')) {
+            rawArray = String(imgStr).split(/,(?=data:image)/);
+        } else {
+            rawArray = String(imgStr).split(',');
+        }
+    }
+
+    // Clean data fragments, drop broken text links, discard blank items
+    let cleanArray = rawArray.map(item => {
         let clean = item.trim();
-        // If it starts with raw base64 patterns but missing headers, inject prefix safely
+        if (!clean) return null;
+        
+        // If raw base64 data strings are missing headers, add them back
         if (clean.startsWith('/9j/') || clean.startsWith('iVBORw0KGg')) {
             return 'data:image/jpeg;base64,' + clean;
         }
         return clean;
-    });
+    }).filter(item => item !== null && item.length > 15); // Drop short corrupt strings
+
+    return cleanArray.length > 0 ? cleanArray : [fallbackPlaceholder];
 }
 
 function filterStore() {
@@ -71,7 +90,6 @@ function filterStore() {
     container.innerHTML = '';
 
     const filtered = products.filter(p => {
-        // Run category filters first
         if (selectedCategoryFilter !== "All" && p.status !== selectedCategoryFilter) return false;
         
         const matchesName = p.name ? p.name.toLowerCase().includes(searchQuery) : false;
@@ -84,7 +102,6 @@ function filterStore() {
         return;
     }
 
-    // Paginate data slicing to prevent UI performance choking
     const itemsToRender = filtered.slice(0, displayLimit);
 
     itemsToRender.forEach(product => {
@@ -142,7 +159,7 @@ function filterStore() {
         container.innerHTML += `
             <div class="product-card" onclick="openDetailsModal('${product.dbKey}')">
                 <div class="img-container">
-                    <img src="${firstImg}" class="product-img" loading="lazy" alt="Product Image">
+                    <img src="${firstImg}" class="product-img" loading="lazy" alt="Product Image" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'100\\' height=\\'100\\' viewBox=\\'0 0 24 24\\' fill=\\'none\\' stroke=\\'%23cbd5e1\\' stroke-width=\\'2\\'><rect x=\\'3\\' y=\\'3\\' width=\\'18\\' height=\\'18\\' rx=\\'2\\'/><circle cx=\\'8.5\\' cy=\\'8.5\\' r=\\'1.5\\'/><path d=\\'M21 15l-5-5L5 21\\'/></svg>'">
                     ${discountBadgeHTML}
                     ${stockCountHTML}
                     ${overlayHTML}
@@ -161,7 +178,6 @@ function filterStore() {
             </div>`;
     });
 
-    // Append a "Load More" handle to prevent sudden continuous thread freezes
     if (filtered.length > displayLimit) {
         container.innerHTML += `
             <div style="grid-column: span 2; text-align: center; padding: 1rem;">
@@ -254,7 +270,7 @@ function openDetailsModal(dbKey) {
     if (sanitizedImages.length > 1) {
         sanitizedImages.forEach((imgUrl, index) => {
             thumbsContainer.innerHTML += `
-                <img src="${imgUrl}" class="thumb-img ${index === 0 ? 'active' : ''}" onclick="document.getElementById('details-main-img').src='${imgUrl}'">
+                <img src="${imgUrl}" class="thumb-img ${index === 0 ? 'active' : ''}" onclick="document.getElementById('details-main-img').src='${imgUrl}'" onerror="this.style.display='none'">
             `;
         });
     }
@@ -266,7 +282,6 @@ function closeDetailsModal() {
     document.getElementById('detailsModal').style.display = "none";
 }
 
-// CLIENT-SIDE HIGH PERFORMANCE COMPRESSION LAYER
 function handleImageUpload(event) {
     const files = event.target.files;
     if (!files) return;
@@ -279,7 +294,6 @@ function handleImageUpload(event) {
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
                 
-                // Scale bounds down to web optimized ratios
                 const MAX_WIDTH = 500;
                 let width = img.width;
                 let height = img.height;
@@ -293,7 +307,6 @@ function handleImageUpload(event) {
                 canvas.height = height;
                 ctx.drawImage(img, 0, 0, width, height);
                 
-                // Compress image to standard 60% JPEG quality
                 const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
                 uploadedImagesArray.push(compressedBase64);
                 renderAdminPreviews();
@@ -313,10 +326,14 @@ function removePreviewImage(index) {
 function renderAdminPreviews() {
     const wrapper = document.getElementById('admin-preview-wrapper');
     wrapper.innerHTML = '';
+    
+    // Discard any empty or corrupt items before rendering previews
+    uploadedImagesArray = uploadedImagesArray.filter(img => img && img.trim().length > 15);
+
     uploadedImagesArray.forEach((base64Data, index) => {
         wrapper.innerHTML += `
             <div class="thumb-preview-container">
-                <img src="${base64Data}">
+                <img src="${base64Data}" onerror="this.parentElement.style.display='none'">
                 <span class="remove-thumb-btn" onclick="removePreviewImage(${index})">✕</span>
             </div>`;
     });
@@ -336,8 +353,11 @@ function saveProduct(e) {
     let code = document.getElementById('prod-code').value.trim();
     const status = document.getElementById('prod-status').value;
 
+    // Filter out blank slots before storing strings
+    uploadedImagesArray = uploadedImagesArray.filter(img => img && img.trim().length > 15);
+
     if (uploadedImagesArray.length === 0) {
-        alert("Please add an image.");
+        alert("Please add at least one image.");
         return;
     }
 
@@ -345,7 +365,8 @@ function saveProduct(e) {
     const userPass = prompt("Enter Password:");
     if (!userPass) return;
 
-    const imgPayloadString = uploadedImagesArray.join(',');
+    // Use pipe '|' instead of comma to ensure clean database array storage splits
+    const imgPayloadString = uploadedImagesArray.join('|');
     const productPayload = { code, name, price, mrp, stock, description, img: imgPayloadString, status, updatedTime: Date.now() };
 
     database.ref('admin_pass').once('value').then((snapshot) => {
