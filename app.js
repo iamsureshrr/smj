@@ -19,8 +19,9 @@ let isAdmin = false;
 let selectedCategoryFilter = "In Stock"; 
 const WHATSAPP_NUMBER = "918778096977";
 
-let uploadedImagesArray = [];
-let displayLimit = 4; // Render chunk boundaries to speed up visual paint
+let uploadedImagesArray = []; // Holds items structured as "thumbnailData*hdData"
+let displayLimit = 4; 
+let isScrollLoading = false;
 
 const urlParams = new URLSearchParams(window.location.search);
 if (urlParams.get('manage') === 'true') {
@@ -33,7 +34,7 @@ if (urlParams.get('manage') === 'true') {
     document.getElementById('chip-InStock').classList.add('active');
 }
 
-// Fetch database configurations efficiently
+// Fetch database records
 database.ref('products').on('value', (snapshot) => {
     document.getElementById('loading-indicator').style.display = 'none';
     const data = snapshot.val();
@@ -49,39 +50,41 @@ database.ref('products').on('value', (snapshot) => {
     console.error(error);
 });
 
-// Clean up and safely split images without c*****g base64 tags
-function sanitizeImageString(imgStr) {
-    const fallbackPlaceholder = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='none' stroke='%23cbd5e1' stroke-width='2'><rect x='3' y='3' width='18' height='18' rx='2'/><circle cx='8.5' cy='8.5' r='1.5'/><path d='M21 15l-5-5L5 21'/></svg>";
-    if (!imgStr || imgStr === "Local Image Loaded" || String(imgStr).trim() === "") {
-        return [fallbackPlaceholder];
-    }
+// Setup Automated Infinite Scroll Monitoring
+window.addEventListener('scroll', () => {
+    if (isScrollLoading) return;
     
-    // Support both old commas and our safe new pipe character '|'
-    let rawArray = [];
-    if (String(imgStr).includes('|')) {
-        rawArray = String(imgStr).split('|');
-    } else {
-        // If old data format has multiple data URLs separated by comma
-        if (String(imgStr).includes('data:image')) {
-            rawArray = String(imgStr).split(/,(?=data:image)/);
-        } else {
-            rawArray = String(imgStr).split(',');
+    // Trigger window load boundary when user scrolls within 150px of the bottom edge
+    if ((window.innerHeight + window.scrollY) >= document.documentElement.scrollHeight - 150) {
+        const searchQuery = document.getElementById('search-box').value.toLowerCase().trim();
+        const filteredCount = products.filter(p => {
+            if (selectedCategoryFilter !== "All" && p.status !== selectedCategoryFilter) return false;
+            if (searchQuery && !p.name?.toLowerCase().includes(searchQuery) && !p.code?.toLowerCase().includes(searchQuery)) return false;
+            return true;
+        }).length;
+
+        if (displayLimit < filteredCount) {
+            isScrollLoading = true;
+            displayLimit += 4;
+            filterStore();
+            setTimeout(() => { isScrollLoading = false; }, 400); // Prevent duplicate bounce triggers
         }
     }
+});
 
-    // Clean data fragments, drop broken text links, discard blank items
-    let cleanArray = rawArray.map(item => {
-        let clean = item.trim();
-        if (!clean) return null;
-        
-        // If raw base64 data strings are missing headers, add them back
-        if (clean.startsWith('/9j/') || clean.startsWith('iVBORw0KGg')) {
-            return 'data:image/jpeg;base64,' + clean;
+// Separates the fast preview element from high resolution source packages cleanly
+function parseProductImage(imgStr, getHD = false) {
+    const fallback = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='none' stroke='%23cbd5e1' stroke-width='2'><rect x='3' y='3' width='18' height='18' rx='2'/><circle cx='8.5' cy='8.5' r='1.5'/><path d='M21 15l-5-5L5 21'/></svg>";
+    if (!imgStr || imgStr === "Local Image Loaded" || String(imgStr).trim() === "") return [fallback];
+
+    let items = String(imgStr).split('|');
+    return items.map(entry => {
+        if (entry.includes('*')) {
+            let parts = entry.split('*');
+            return getHD ? parts[1] : parts[0]; 
         }
-        return clean;
-    }).filter(item => item !== null && item.length > 15); // Drop short corrupt strings
-
-    return cleanArray.length > 0 ? cleanArray : [fallbackPlaceholder];
+        return entry; // Fallback structure handling for historical rows
+    }).filter(str => str && str.length > 15);
 }
 
 function filterStore() {
@@ -91,7 +94,6 @@ function filterStore() {
 
     const filtered = products.filter(p => {
         if (selectedCategoryFilter !== "All" && p.status !== selectedCategoryFilter) return false;
-        
         const matchesName = p.name ? p.name.toLowerCase().includes(searchQuery) : false;
         const matchesCode = p.code ? p.code.toLowerCase().includes(searchQuery) : false;
         return searchQuery === "" || matchesName || matchesCode;
@@ -153,13 +155,14 @@ function filterStore() {
                 <button class="btn btn-danger" onclick="event.stopPropagation(); deleteProduct('${product.dbKey}')">Delete</button>
             </div>` : '';
 
-        const sanitizedImages = sanitizeImageString(product.img);
-        const firstImg = sanitizedImages[0];
+        // Load Fast Preview Thumbnail for grid overview
+        const thumbnails = parseProductImage(product.img, false);
+        const firstThumb = thumbnails[0];
 
         container.innerHTML += `
             <div class="product-card" onclick="openDetailsModal('${product.dbKey}')">
                 <div class="img-container">
-                    <img src="${firstImg}" class="product-img" loading="lazy" alt="Product Image" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'100\\' height=\\'100\\' viewBox=\\'0 0 24 24\\' fill=\\'none\\' stroke=\\'%23cbd5e1\\' stroke-width=\\'2\\'><rect x=\\'3\\' y=\\'3\\' width=\\'18\\' height=\\'18\\' rx=\\'2\\'/><circle cx=\\'8.5\\' cy=\\'8.5\\' r=\\'1.5\\'/><path d=\\'M21 15l-5-5L5 21\\'/></svg>'">
+                    <img src="${firstThumb}" class="product-img" loading="lazy" alt="Product Image">
                     ${discountBadgeHTML}
                     ${stockCountHTML}
                     ${overlayHTML}
@@ -177,18 +180,6 @@ function filterStore() {
                 </div>
             </div>`;
     });
-
-    if (filtered.length > displayLimit) {
-        container.innerHTML += `
-            <div style="grid-column: span 2; text-align: center; padding: 1rem;">
-                <button class="btn btn-secondary" style="width:100%; max-width: 300px;" onclick="event.stopPropagation(); loadMoreProducts()">Load More Products...</button>
-            </div>`;
-    }
-}
-
-function loadMoreProducts() {
-    displayLimit += 4;
-    filterStore();
 }
 
 function selectCategory(category, element) {
@@ -200,56 +191,37 @@ function selectCategory(category, element) {
 }
 
 function addToCart(dbKey) {
-    if (!shoppingCart[dbKey] && Object.keys(shoppingCart).length >= 20) {
-        alert("Cart Limit Reached");
-        return;
-    }
-    shoppingCart[dbKey] = 1;
-    updateCartUI();
-    filterStore();
+    if (!shoppingCart[dbKey] && Object.keys(shoppingCart).length >= 20) return;
+    shoppingCart[dbKey] = 1; updateCartUI(); filterStore();
 }
 
 function changeQty(dbKey, delta) {
     if (!shoppingCart[dbKey]) return;
     const targetQty = shoppingCart[dbKey] + delta;
-    if (targetQty <= 0) {
-        delete shoppingCart[dbKey];
-    } else if (targetQty > 10) {
-        alert("Maximum limit is 10 items.");
-        return;
-    } else {
-        shoppingCart[dbKey] = targetQty;
-    }
-    updateCartUI();
-    filterStore();
+    if (targetQty <= 0) delete shoppingCart[dbKey];
+    else if (targetQty > 10) return;
+    else shoppingCart[dbKey] = targetQty;
+    updateCartUI(); filterStore();
 }
 
 function updateCartUI() {
     const bar = document.getElementById('cart-sticky-bar');
     const uniqueKeys = Object.keys(shoppingCart);
-    if (uniqueKeys.length === 0) {
-        bar.style.display = "none";
-        return;
-    }
+    if (uniqueKeys.length === 0) { bar.style.display = "none"; return; }
     bar.style.display = "flex";
-
-    let totalItems = 0;
-    let totalPrice = 0;
-
+    let totalItems = 0; let totalPrice = 0;
     uniqueKeys.forEach(key => {
         const prod = products.find(p => p.dbKey === key);
         if (prod) {
-            const qty = shoppingCart[key];
-            totalItems += qty;
-            let numericPrice = parseFloat(String(prod.price || '0').replace(/[^0-9.]/g, '')) || 0;
-            totalPrice += (numericPrice * qty);
+            totalItems += shoppingCart[key];
+            totalPrice += ((parseFloat(String(prod.price || '0').replace(/[^0-9.]/g, '')) || 0) * shoppingCart[key]);
         }
     });
-
     document.getElementById('cart-count').innerText = totalItems;
     document.getElementById('cart-total-price').innerText = "₹" + totalPrice;
 }
 
+// Open modal and load lossless HD images
 function openDetailsModal(dbKey) {
     const prod = products.find(p => p.dbKey === dbKey);
     if (!prod) return;
@@ -261,27 +233,32 @@ function openDetailsModal(dbKey) {
     let cleanPrice = parseFloat(String(prod.price || '0').replace(/[^0-9.]/g, '')) || 0;
     document.getElementById('details-price-block').innerHTML = `<span style="font-size:1.4rem; font-weight:bold;">₹${cleanPrice}</span>`;
 
-    const sanitizedImages = sanitizeImageString(prod.img);
-    document.getElementById('details-main-img').src = sanitizedImages[0];
+    // Fetch the Lossless High Definition file for presentation views
+    const hdImages = parseProductImage(prod.img, true);
+    const mainImgNode = document.getElementById('details-main-img');
+    mainImgNode.src = hdImages[0];
 
     const thumbsContainer = document.getElementById('details-thumbs');
     thumbsContainer.innerHTML = '';
 
-    if (sanitizedImages.length > 1) {
-        sanitizedImages.forEach((imgUrl, index) => {
-            thumbsContainer.innerHTML += `
-                <img src="${imgUrl}" class="thumb-img ${index === 0 ? 'active' : ''}" onclick="document.getElementById('details-main-img').src='${imgUrl}'" onerror="this.style.display='none'">
-            `;
-        });
-    }
+    hdImages.forEach((imgUrl, index) => {
+        thumbsContainer.innerHTML += `
+            <img src="${imgUrl}" class="thumb-img ${index === 0 ? 'active' : ''}" onclick="switchDetailsHDImage('${imgUrl}', this)" onerror="this.style.display='none'">
+        `;
+    });
 
     document.getElementById('detailsModal').style.display = "flex";
 }
 
-function closeDetailsModal() {
-    document.getElementById('detailsModal').style.display = "none";
+function switchDetailsHDImage(url, element) {
+    document.getElementById('details-main-img').src = url;
+    document.querySelectorAll('.thumb-img').forEach(t => t.classList.remove('active'));
+    element.classList.add('active');
 }
 
+function closeDetailsModal() { document.getElementById('detailsModal').style.display = "none"; }
+
+// Double Image Compression Pipeline (Saves preview and high quality files together)
 function handleImageUpload(event) {
     const files = event.target.files;
     if (!files) return;
@@ -291,24 +268,28 @@ function handleImageUpload(event) {
         reader.onload = function(e) {
             const img = new Image();
             img.onload = function() {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                
-                const MAX_WIDTH = 500;
-                let width = img.width;
-                let height = img.height;
+                // 1. Build Lossless Web-Optimized Quality Image
+                const canvasHD = document.createElement('canvas');
+                const ctxHD = canvasHD.getContext('2d');
+                const MAX_HD_WIDTH = 1200; // Large detailed viewport target boundary
+                let wHD = img.width; let hHD = img.height;
+                if (wHD > MAX_HD_WIDTH) { hHD = Math.round((hHD * MAX_HD_WIDTH) / wHD); wHD = MAX_HD_WIDTH; }
+                canvasHD.width = wHD; canvasHD.height = hHD;
+                ctxHD.drawImage(img, 0, 0, wHD, hHD);
+                const hdBase64 = canvasHD.toDataURL('image/jpeg', 0.92); // Crystal clear lossless render quality
 
-                if (width > MAX_WIDTH) {
-                    height = Math.round((height * MAX_WIDTH) / width);
-                    width = MAX_WIDTH;
-                }
+                // 2. Build Fast Grid Preview Thumbnail File
+                const canvasThumb = document.createElement('canvas');
+                const ctxThumb = canvasThumb.getContext('2d');
+                const MAX_THUMB_WIDTH = 320; 
+                let wT = img.width; let hT = img.height;
+                if (wT > MAX_THUMB_WIDTH) { hT = Math.round((hT * MAX_THUMB_WIDTH) / wT); wT = MAX_THUMB_WIDTH; }
+                canvasThumb.width = wT; canvasThumb.height = hT;
+                ctxThumb.drawImage(img, 0, 0, wT, hT);
+                const thumbBase64 = canvasThumb.toDataURL('image/jpeg', 0.5); // Accelerated lightweight rendering cache
 
-                canvas.width = width;
-                canvas.height = height;
-                ctx.drawImage(img, 0, 0, width, height);
-                
-                const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
-                uploadedImagesArray.push(compressedBase64);
+                // Bundle data parameters safely using the clear asterisk character *
+                uploadedImagesArray.push(thumbBase64 + '*' + hdBase64);
                 renderAdminPreviews();
             };
             img.src = e.target.result;
@@ -323,18 +304,33 @@ function removePreviewImage(index) {
     renderAdminPreviews();
 }
 
+function makePrimaryImage(index) {
+    if (index <= 0 || index >= uploadedImagesArray.length) return;
+    const selectedItem = uploadedImagesArray.splice(index, 1)[0];
+    uploadedImagesArray.unshift(selectedItem);
+    renderAdminPreviews();
+}
+
 function renderAdminPreviews() {
     const wrapper = document.getElementById('admin-preview-wrapper');
     wrapper.innerHTML = '';
     
-    // Discard any empty or corrupt items before rendering previews
     uploadedImagesArray = uploadedImagesArray.filter(img => img && img.trim().length > 15);
 
-    uploadedImagesArray.forEach((base64Data, index) => {
+    uploadedImagesArray.forEach((combinedString, index) => {
+        const isMain = index === 0;
+        // Read thumbnail for admin preview window rendering speed
+        const displayImg = combinedString.includes('*') ? combinedString.split('*')[0] : combinedString;
+
+        const badgeHTML = isMain 
+            ? `<span class="main-badge-indicator" style="position:absolute; bottom:2px; left:2px; font-size:10px; background:rgba(22,163,74,0.9); color:white; padding:2px 4px; border-radius:3px;">Main Card Cover</span>`
+            : `<span class="set-main-star-btn" onclick="makePrimaryImage(${index})" style="position:absolute; bottom:2px; left:2px; font-size:14px; background:rgba(255,255,255,0.9); cursor:pointer; padding:1px 4px; border-radius:3px; border:1px solid #ccc;">⭐ Set Main</span>`;
+
         wrapper.innerHTML += `
-            <div class="thumb-preview-container">
-                <img src="${base64Data}" onerror="this.parentElement.style.display='none'">
-                <span class="remove-thumb-btn" onclick="removePreviewImage(${index})">✕</span>
+            <div class="thumb-preview-container" style="position:relative; display:inline-block; margin:5px; border:${isMain ? '2px solid #16a34a' : '1px solid #ccc'}; border-radius:4px; padding:2px;">
+                <img src="${displayImg}" style="width:75px; height:75px; object-fit:cover;">
+                <span class="remove-thumb-btn" onclick="removePreviewImage(${index})" style="position:absolute; top:2px; right:2px; background:rgba(220,38,38,0.8); color:white; border-radius:50%; width:16px; height:16px; text-align:center; font-size:11px; line-height:16px; cursor:pointer;">✕</span>
+                ${badgeHTML}
             </div>`;
     });
 }
@@ -353,19 +349,13 @@ function saveProduct(e) {
     let code = document.getElementById('prod-code').value.trim();
     const status = document.getElementById('prod-status').value;
 
-    // Filter out blank slots before storing strings
     uploadedImagesArray = uploadedImagesArray.filter(img => img && img.trim().length > 15);
-
-    if (uploadedImagesArray.length === 0) {
-        alert("Please add at least one image.");
-        return;
-    }
-
+    if (uploadedImagesArray.length === 0) { alert("Please add an image."); return; }
     if (!code) code = "PRD-" + Math.floor(1000 + Math.random() * 9000);
+
     const userPass = prompt("Enter Password:");
     if (!userPass) return;
 
-    // Use pipe '|' instead of comma to ensure clean database array storage splits
     const imgPayloadString = uploadedImagesArray.join('|');
     const productPayload = { code, name, price, mrp, stock, description, img: imgPayloadString, status, updatedTime: Date.now() };
 
@@ -373,11 +363,7 @@ function saveProduct(e) {
         if (snapshot.val() === userPass) {
             const refPath = dbKey ? 'products/' + dbKey : 'products';
             const operation = dbKey ? database.ref(refPath).set(productPayload) : database.ref(refPath).push(productPayload);
-            
-            operation.then(() => {
-                closeAdminPopup();
-                alert("Saved successfully!");
-            });
+            operation.then(() => { closeAdminPopup(); alert("Saved successfully!"); });
         } else {
             alert("Wrong password!");
         }
@@ -397,9 +383,15 @@ function editProduct(dbKey) {
     document.getElementById('prod-desc').value = prod.description || '';
     document.getElementById('prod-status').value = prod.status;
     
-    uploadedImagesArray = sanitizeImageString(prod.img);
-    renderAdminPreviews();
+    // Read historical content structures safely 
+    if (prod.img && !prod.img.includes('*') && prod.img.length > 50) {
+        let oldImages = prod.img.split(prod.img.includes('|') ? '|' : ',');
+        uploadedImagesArray = oldImages.map(img => img.trim() + '*' + img.trim());
+    } else {
+        uploadedImagesArray = prod.img ? prod.img.split('|') : [];
+    }
     
+    renderAdminPreviews();
     document.getElementById('form-title').innerText = "Edit Product";
     document.getElementById('adminModal').style.display = "flex";
 }
@@ -408,11 +400,8 @@ function deleteProduct(dbKey) {
     if (confirm("Delete permanently?")) {
         const userPass = prompt("Enter Password:");
         database.ref('admin_pass').once('value').then((snapshot) => {
-            if (snapshot.val() === userPass) {
-                database.ref('products/' + dbKey).remove();
-            } else {
-                alert("Wrong password!");
-            }
+            if (snapshot.val() === userPass) { database.ref('products/' + dbKey).remove(); }
+            else { alert("Wrong password!"); }
         });
     }
 }
