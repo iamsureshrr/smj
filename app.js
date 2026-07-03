@@ -19,7 +19,9 @@ let isAdmin = false;
 let selectedCategoryFilter = "In Stock"; 
 const WHATSAPP_NUMBER = "918778096977";
 
-// Run URL Query state checks
+// Holds an array of base64 strings for newly uploaded images
+let uploadedImagesArray = [];
+
 const urlParams = new URLSearchParams(window.location.search);
 if (urlParams.get('manage') === 'true') {
     isAdmin = true;
@@ -31,7 +33,6 @@ if (urlParams.get('manage') === 'true') {
     document.getElementById('chip-InStock').classList.add('active');
 }
 
-// Stream data down live
 database.ref('products').on('value', (snapshot) => {
     document.getElementById('loading-indicator').style.display = 'none';
     const data = snapshot.val();
@@ -46,21 +47,16 @@ database.ref('products').on('value', (snapshot) => {
     alert("Database Connection Issue detected.");
 });
 
-// Advanced multi-value search query filter engine
 function filterStore() {
     const searchQuery = document.getElementById('search-box').value.toLowerCase().trim();
     const container = document.getElementById('products-container');
     container.innerHTML = '';
 
     const filtered = products.filter(p => {
-        const matchesName = p.name.toLowerCase().includes(searchQuery);
-        const matchesCode = p.code.toLowerCase().includes(searchQuery);
-        const matchesPrice = p.price && p.price.toLowerCase().includes(searchQuery);
-        const matchesMRP = p.mrp && p.mrp.toLowerCase().includes(searchQuery);
-        
-        const matchesSearch = matchesName || matchesCode || matchesPrice || matchesMRP;
-        const matchesCategory = (selectedCategoryFilter === "All") || (p.status === selectedCategoryFilter);
-        return matchesSearch && matchesCategory;
+        const matchesName = p.name ? p.name.toLowerCase().includes(searchQuery) : false;
+        const matchesCode = p.code ? p.code.toLowerCase().includes(searchQuery) : false;
+        const matchesPrice = p.price ? String(p.price).toLowerCase().includes(searchQuery) : false;
+        return matchesName || matchesCode || matchesPrice;
     });
 
     if (filtered.length === 0) {
@@ -70,31 +66,28 @@ function filterStore() {
 
     filtered.forEach(product => {
         let overlayHTML = '';
-        let displayPriceHTML = `<div class="product-price">${product.price}</div>`;
+        let displayPriceHTML = `<div class="product-price">₹${parseFloat(String(product.price || '0').replace(/[^0-9.]/g, '')) || 0}</div>`;
         let buttonHTML = '';
         
-        // Calculate dynamic math discounts instantly
         let discountBadgeHTML = '';
         if (product.mrp && product.price && product.status !== "Coming Soon") {
-            let numMRP = parseInt(product.mrp.replace(/[^0-9]/g, '')) || 0;
-            let numPrice = parseInt(product.price.replace(/[^0-9]/g, '')) || 0;
+            let numMRP = parseFloat(String(product.mrp).replace(/[^0-9.]/g, '')) || 0;
+            let numPrice = parseFloat(String(product.price).replace(/[^0-9.]/g, '')) || 0;
             if (numMRP > numPrice) {
                 let pct = Math.round(((numMRP - numPrice) / numMRP) * 100);
                 if (pct > 0) discountBadgeHTML = `<div class="discount-badge">${pct}% OFF</div>`;
                 displayPriceHTML = `
-                    <div class="product-price">${product.price}</div>
-                    <div class="product-mrp-crossed">${product.mrp}</div>
+                    <div class="product-price">₹${numPrice}</div>
+                    <div class="product-mrp-crossed">₹${numMRP}</div>
                 `;
             }
         }
 
-        // Render stock counts safely
         let stockCountHTML = '';
         if (product.stock && parseInt(product.stock) > 0 && product.status === "In Stock") {
             stockCountHTML = `<div class="stock-count-label">Stock: ${product.stock}</div>`;
         }
 
-        // Cart Actions mapping to inline minus-counter-plus selectors
         const currentQty = shoppingCart[product.dbKey] || 0;
         if (currentQty > 0) {
             buttonHTML = `
@@ -130,22 +123,23 @@ function filterStore() {
             `;
         }
 
-        // Extract the first image link for the grid card view portrait
-        const imagesArray = product.img ? product.img.split(',') : [''];
-        const firstImg = imagesArray[0].trim();
+        // Clean up broken or invalid image strings safely
+        const imagesArray = (product.img && product.img !== "Local Image Loaded") ? product.img.split(',') : [];
+        const fallbackPlaceholder = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='none' stroke='%23cbd5e1' stroke-width='2'><rect x='3' y='3' width='18' height='18' rx='2'/><circle cx='8.5' cy='8.5' r='1.5'/><path d='M21 15l-5-5L5 21'/></svg>";
+        const firstImg = imagesArray.length > 0 ? imagesArray[0].trim() : fallbackPlaceholder;
 
         container.innerHTML += `
             <div class="product-card" onclick="openDetailsModal('${product.dbKey}')">
                 <div class="img-container">
-                    <img src="${firstImg}" class="product-img" alt="${product.name}">
+                    <img src="${firstImg}" class="product-img" alt="${product.name}" onerror="this.src='${fallbackPlaceholder}'">
                     ${discountBadgeHTML}
                     ${stockCountHTML}
                     ${overlayHTML}
                 </div>
                 <div class="product-info">
                     <div>
-                        <div class="product-code">${product.code}</div>
-                        <h3 class="product-title">${product.name}</h3>
+                        <div class="product-code">${product.code || ''}</div>
+                        <h3 class="product-title">${product.name || ''}</h3>
                         <div class="price-layout-container">${displayPriceHTML}</div>
                     </div>
                     <div>
@@ -165,7 +159,6 @@ function selectCategory(category, element) {
     filterStore();
 }
 
-// Shopping cart calculations
 function addToCart(dbKey) {
     const distinctItemsCount = Object.keys(shoppingCart).length;
     if (!shoppingCart[dbKey] && distinctItemsCount >= 20) {
@@ -174,7 +167,7 @@ function addToCart(dbKey) {
     }
     shoppingCart[dbKey] = 1;
     updateCartUI();
-    filterStore(); // Refresh grid layout updates instantly
+    filterStore();
     if(document.getElementById('detailsModal').style.display === "flex") {
         renderDetailsActionContainer(dbKey);
     }
@@ -193,7 +186,7 @@ function changeQty(dbKey, delta) {
     }
     updateCartUI();
     renderCartDrawer();
-    filterStore(); // Keep screen counters flawlessly synced
+    filterStore();
     if(document.getElementById('detailsModal').style.display === "flex") {
         renderDetailsActionContainer(dbKey);
     }
@@ -216,7 +209,7 @@ function updateCartUI() {
         if (prod) {
             const qty = shoppingCart[key];
             totalItems += qty;
-            let numericPrice = parseInt(prod.price.replace(/[^0-9]/g, '')) || 0;
+            let numericPrice = parseFloat(String(prod.price || '0').replace(/[^0-9.]/g, '')) || 0;
             totalPrice += (numericPrice * qty);
         }
     });
@@ -233,7 +226,6 @@ function openCartDrawer() {
 
 function closeCartDrawer(e) {
     if (!e || e.target === document.getElementById('cartDrawer')) {
-        document.getElementById('cartDrawer').style.none;
         document.getElementById('cartDrawer').style.display = "none";
     }
 }
@@ -253,6 +245,7 @@ function renderCartDrawer() {
         const item = products.find(p => p.dbKey === key);
         if (item) {
             const qty = shoppingCart[key];
+            let cleanPrice = parseFloat(String(item.price || '0').replace(/[^0-9.]/g, '')) || 0;
             container.innerHTML += `
                 <div class="cart-item">
                     <div class="cart-item-details">
@@ -264,36 +257,38 @@ function renderCartDrawer() {
                         <span style="font-weight:bold; min-width:20px; text-align:center;">${qty}</span>
                         <button class="btn-qty" onclick="changeQty('${key}', 1)">+</button>
                     </div>
-                    <span style="font-weight:bold; min-width:60px; text-align:right;">${item.price}</span>
+                    <span style="font-weight:bold; min-width:60px; text-align:right;">₹${cleanPrice}</span>
                 </div>
             `;
         }
     });
 }
 
-// Product description details modal presentation channel
 function openDetailsModal(dbKey) {
     const prod = products.find(p => p.dbKey === dbKey);
     if (!prod) return;
 
-    document.getElementById('details-code').innerText = prod.code;
-    document.getElementById('details-title').innerText = prod.name;
-    document.getElementById('details-desc').innerText = prod.description ? prod.description : "No additional description details available for this model layout.";
+    document.getElementById('details-code').innerText = prod.code || '';
+    document.getElementById('details-title').innerText = prod.name || '';
+    document.getElementById('details-desc').innerText = prod.description || "No description provided.";
     
-    // Status badges handler
-    let statusBadgeText = `<span style="color:var(--success); font-weight:bold;">● Available in Store</span>`;
-    let priceHTML = `<span style="font-size:1.4rem; font-weight:bold; color:var(--dark);">${prod.price}</span>`;
+    let statusBadgeText = `<span style="color:var(--success); font-weight:bold;">● Available</span>`;
+    let cleanPrice = parseFloat(String(prod.price || '0').replace(/[^0-9.]/g, '')) || 0;
+    let priceHTML = `<span style="font-size:1.4rem; font-weight:bold; color:var(--dark);">₹${cleanPrice}</span>`;
     
     if (prod.mrp && prod.status !== "Coming Soon") {
-        priceHTML += ` <span style="text-decoration:line-through; color:#94a3b8; font-size:1rem; margin-left:0.5rem;">${prod.mrp}</span>`;
+        let cleanMRP = parseFloat(String(prod.mrp).replace(/[^0-9.]/g, '')) || 0;
+        if (cleanMRP > cleanPrice) {
+            priceHTML += ` <span style="text-decoration:line-through; color:#94a3b8; font-size:1rem; margin-left:0.5rem;">₹${cleanMRP}</span>`;
+        }
     }
 
     if (prod.status === "Sold") {
         statusBadgeText = `<span style="color:#dc2626; font-weight:bold;">● Sold Out</span>`;
     } else if (prod.status === "Out of Stock") {
-        statusBadgeText = `<span style="color:#ea580c; font-weight:bold;">● Temporarily Out of Stock</span>`;
+        statusBadgeText = `<span style="color:#ea580c; font-weight:bold;">● Out of Stock</span>`;
     } else if (prod.status === "Coming Soon") {
-        statusBadgeText = `<span style="color:#64748b; font-weight:bold;">● Coming Soon Collection</span>`;
+        statusBadgeText = `<span style="color:#64748b; font-weight:bold;">● Coming Soon</span>`;
         priceHTML = `<span style="font-size:1.4rem; font-weight:bold; color:#64748b;">****</span>`;
     }
 
@@ -301,10 +296,12 @@ function openDetailsModal(dbKey) {
     document.getElementById('details-stock-status').innerHTML = statusBadgeText + stockText;
     document.getElementById('details-price-block').innerHTML = priceHTML;
 
-    // Load multi-image carousel components
-    const imagesArray = prod.img ? prod.img.split(',') : [''];
+    const fallbackPlaceholder = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='none' stroke='%23cbd5e1' stroke-width='2'><rect x='3' y='3' width='18' height='18' rx='2'/><circle cx='8.5' cy='8.5' r='1.5'/><path d='M21 15l-5-5L5 21'/></svg>";
+    const imagesArray = (prod.img && prod.img !== "Local Image Loaded") ? prod.img.split(',') : [];
+    
     const mainImgElem = document.getElementById('details-main-img');
-    mainImgElem.src = imagesArray[0].trim();
+    mainImgElem.src = imagesArray.length > 0 ? imagesArray[0].trim() : fallbackPlaceholder;
+    mainImgElem.onerror = function() { this.src = fallbackPlaceholder; };
 
     const thumbsContainer = document.getElementById('details-thumbs');
     thumbsContainer.innerHTML = '';
@@ -314,7 +311,7 @@ function openDetailsModal(dbKey) {
             const cleanUrl = imgUrl.trim();
             const activeClass = index === 0 ? 'active' : '';
             thumbsContainer.innerHTML += `
-                <img src="${cleanUrl}" class="thumb-img ${activeClass}" onclick="switchDetailsMainImage('${cleanUrl}', this)">
+                <img src="${cleanUrl}" class="thumb-img ${activeClass}" onerror="this.style.display='none'" onclick="switchDetailsMainImage('${cleanUrl}', this)">
             `;
         });
     }
@@ -335,7 +332,7 @@ function renderDetailsActionContainer(dbKey) {
     container.innerHTML = '';
 
     if (prod.status !== "In Stock") {
-        container.innerHTML = `<button class="btn btn-secondary" style="width:100%; padding:0.8rem;" disabled>Item Unavailable</button>`;
+        container.innerHTML = `<button class="btn btn-secondary" style="width:100%; padding:0.8rem;" disabled>Unavailable</button>`;
         return;
     }
 
@@ -344,12 +341,12 @@ function renderDetailsActionContainer(dbKey) {
         container.innerHTML = `
             <div class="inline-qty-selector" style="padding: 0.4rem 1rem;">
                 <button class="btn-qty" style="padding:0.4rem 0.8rem; font-size:1.1rem;" onclick="changeQty('${dbKey}', -1)">-</button>
-                <span style="font-size:1.1rem;">${currentQty} Added in Bag</span>
+                <span style="font-size:1.1rem;">${currentQty} in Bag</span>
                 <button class="btn-qty" style="padding:0.4rem 0.8rem; font-size:1.1rem;" onclick="changeQty('${dbKey}', 1)">+</button>
             </div>
         `;
     } else {
-        container.innerHTML = `<button class="btn btn-primary" style="width:100%; padding:0.8rem; font-size:1rem;" onclick="addToCart('${dbKey}')">Add to Shopping Bag</button>`;
+        container.innerHTML = `<button class="btn btn-primary" style="width:100%; padding:0.8rem; font-size:1rem;" onclick="addToCart('${dbKey}')">Add to Bag</button>`;
     }
 }
 
@@ -364,53 +361,55 @@ function checkoutToWhatsApp() {
     Object.keys(shoppingCart).forEach((key, idx) => {
         const item = products.find(p => p.dbKey === key);
         if (item) {
-            messageText += `${idx + 1}. [${item.code}] ${item.name}\n   Qty: ${shoppingCart[key]} x ${item.price}\n`;
+            let cleanPrice = parseFloat(String(item.price || '0').replace(/[^0-9.]/g, '')) || 0;
+            messageText += `${idx + 1}. [${item.code}] ${item.name}\n   Qty: ${shoppingCart[key]} x ₹${cleanPrice}\n`;
         }
     });
     messageText += `\n*Grand Total: ${document.getElementById('drawer-total-price').innerText}*`;
     window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(messageText)}`, '_blank');
 }
 
-// Automatic Currency Formatting Profile Engine (Enforces Rupee Symbol Prefix)
 function formatCurrencyInput(element) {
-    let val = element.value.replace(/[^0-9]/g, '');
-    if (val) {
-        element.value = "₹" + val;
-    } else {
-        element.value = "";
-    }
+    let val = element.value.replace(/[^0-9.]/g, '');
+    element.value = val ? "₹" + val : "";
 }
 
-// Live form URL preview thumbnail builder
-function updateLivePreview(value) {
+function handleImageUpload(event) {
+    const files = event.target.files;
+    if (!files) return;
+
+    Array.from(files).forEach(file => {
+        const reader = new FileReader();
+        reader.onloadend = function() {
+            uploadedImagesArray.push(reader.result);
+            renderAdminPreviews();
+        }
+        reader.readAsDataURL(file);
+    });
+    event.target.value = ""; // Clear input file profile picker channels
+}
+
+function removePreviewImage(index) {
+    uploadedImagesArray.splice(index, 1);
+    renderAdminPreviews();
+}
+
+function renderAdminPreviews() {
     const wrapper = document.getElementById('admin-preview-wrapper');
     wrapper.innerHTML = '';
-    if (!value || value === "Local Image Loaded") return;
-
-    const links = value.split(',');
-    links.forEach(link => {
-        const cleanLink = link.trim();
-        if (cleanLink) {
-            wrapper.innerHTML += `<img src="${cleanLink}" style="width:60px; height:60px; object-fit:cover; border-radius:6px; border:1px solid #cbd5e1;">`;
-        }
+    
+    uploadedImagesArray.forEach((base64Data, index) => {
+        wrapper.innerHTML += `
+            <div class="thumb-preview-container">
+                <img src="${base64Data}">
+                <span class="remove-thumb-btn" onclick="removePreviewImage(${index})">✕</span>
+            </div>
+        `;
     });
 }
 
 function openAdminPopup() { clearForm(); document.getElementById('adminModal').style.display = "flex"; }
 function closeAdminPopup() { document.getElementById('adminModal').style.display = "none"; clearForm(); }
-
-let uploadedImageBase64 = "";
-function handleImageUpload(event) {
-    const file = event.target.files[0];
-    const reader = new FileReader();
-    reader.onloadend = function() {
-        uploadedImageBase64 = reader.result;
-        document.getElementById('prod-img').value = "Local Image Loaded";
-        const wrapper = document.getElementById('admin-preview-wrapper');
-        wrapper.innerHTML = `<img src="${uploadedImageBase64}" style="width:60px; height:60px; object-fit:cover; border-radius:6px; border:1px solid #cbd5e1;">`;
-    }
-    if (file) reader.readAsDataURL(file);
-}
 
 function saveProduct(e) {
     e.preventDefault();
@@ -421,39 +420,39 @@ function saveProduct(e) {
     const stock = document.getElementById('prod-stock').value || "1";
     const description = document.getElementById('prod-desc').value || "";
     let code = document.getElementById('prod-code').value.trim();
-    let img = document.getElementById('prod-img').value;
     const status = document.getElementById('prod-status').value;
 
-    if (img === "Local Image Loaded") img = uploadedImageBase64;
-    if (!code) code = "PRD-" + Math.floor(1000 + Math.random() * 9000);
-
-    const userPass = prompt("Enter Admin Password to save changes:");
-    if (!userPass) {
-        alert("Action cancelled. Password is required.");
+    if (uploadedImagesArray.length === 0) {
+        alert("Please choose at least 1 product image file before saving.");
         return;
     }
 
-    // Fully backwards compatible database schema wrapper object payload layout mapping channels
-    const productPayload = { code, name, price, mrp, stock, description, img, status, updatedTime: Date.now() };
+    if (!code) code = "PRD-" + Math.floor(1000 + Math.random() * 9000);
 
-    const successCallback = () => {
-        document.getElementById('adminModal').style.display = "none";
-        clearForm();
-        alert("Product saved successfully!");
-    };
+    const userPass = prompt("Enter Admin Password to save changes:");
+    if (!userPass) return;
+
+    // Join image matrix elements into flat comma separated records strings
+    const imgPayloadString = uploadedImagesArray.join(',');
+
+    const productPayload = { code, name, price, mrp, stock, description, img: imgPayloadString, status, updatedTime: Date.now() };
 
     database.ref('admin_pass').once('value').then((snapshot) => {
         if (snapshot.val() === userPass) {
             if (dbKey) {
-                database.ref('products/' + dbKey).set(productPayload).then(successCallback);
+                database.ref('products/' + dbKey).set(productPayload).then(() => {
+                    closeAdminPopup();
+                    alert("Product saved successfully!");
+                });
             } else {
-                database.ref('products').push(productPayload).then(successCallback);
+                database.ref('products').push(productPayload).then(() => {
+                    closeAdminPopup();
+                    alert("Product added successfully!");
+                });
             }
         } else {
             alert("Incorrect password! Access Denied.");
         }
-    }).catch((err) => {
-        alert("Error connecting to validation node: " + err.message);
     });
 }
 
@@ -462,17 +461,18 @@ function editProduct(dbKey) {
     if (!prod) return;
     
     document.getElementById('product-id').value = prod.dbKey;
-    document.getElementById('prod-code').value = prod.code;
-    document.getElementById('prod-name').value = prod.name;
-    document.getElementById('prod-price').value = prod.price || "";
-    document.getElementById('prod-mrp').value = prod.mrp || "";
+    document.getElementById('prod-code').value = prod.code || '';
+    document.getElementById('prod-name').value = prod.name || '';
+    document.getElementById('prod-price').value = prod.price || '';
+document.getElementById('prod-mrp').value = prod.mrp || '';
     document.getElementById('prod-stock').value = prod.stock || "1";
-    document.getElementById('prod-desc').value = prod.description || "";
-    document.getElementById('prod-img').value = prod.img;
+    document.getElementById('prod-desc').value = prod.description || '';
     document.getElementById('prod-status').value = prod.status;
     
-    updateLivePreview(prod.img)
-    document.getElementById('form-title').innerText = "Edit " + prod.code;
+    uploadedImagesArray = prod.img ? prod.img.split(',') : [];
+    renderAdminPreviews();
+    
+    document.getElementById('form-title').innerText = "Edit " + (prod.code || 'Product');
     document.getElementById('adminModal').style.display = "flex";
 }
 
@@ -498,6 +498,5 @@ function clearForm() {
     document.getElementById('product-id').value = "";
     document.getElementById('form-title').innerText = "Add Product";
     document.getElementById('admin-preview-wrapper').innerHTML = '';
-    uploadedImageBase64 = "";
+    uploadedImagesArray = [];
 }
-

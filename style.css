@@ -136,6 +136,37 @@ header h1 { font-size: 1.1rem; margin: 0; letter-spacing: 0.5px; }
     background: white; width: 100%; max-width: 420px; border-radius: 14px; padding: 1.2rem;
     max-height: 85vh; overflow-y: auto;
 }
+/* Multi-Image Thumbnail Previews with Cross buttons */
+.thumb-preview-container {
+    position: relative;
+    width: 65px;
+    height: 65px;
+    flex-shrink: 0;
+}
+.thumb-preview-container img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 6px;
+    border: 1px solid #cbd5e1;
+}
+.remove-thumb-btn {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background: #dc2626;
+    color: white;
+    font-size: 0.6rem;
+    font-weight: bold;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
 .form-group { margin-bottom: 0.8rem; }
 .form-group label { display: block; margin-bottom: 0.2rem; font-weight: bold; font-size: 0.8rem; }
 .form-group input, .form-group select {
