@@ -13,7 +13,7 @@
         }
         * { box-sizing: border-box; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             margin: 0;
             padding: 0;
             background-color: var(--light);
@@ -33,81 +33,36 @@
         header h1 { font-size: 1.2rem; margin: 0; }
         .header-actions { display: flex; gap: 0.5rem; align-items: center; }
         
-        /* Mobile Optimized Buttons */
         .btn {
-            color: white;
-            border: none;
-            padding: 0.6rem 0.8rem;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 0.85rem;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
+            color: white; border: none; padding: 0.6rem 0.8rem; border-radius: 6px;
+            cursor: pointer; font-weight: bold; font-size: 0.85rem; text-decoration: none;
+            display: inline-flex; align-items: center; justify-content: center;
         }
         .btn-primary { background-color: var(--primary); }
         .btn-success { background-color: var(--success); }
         .btn-secondary { background-color: #64748b; }
         .btn-danger { background-color: #dc2626; }
         
-        .container {
-            padding: 1rem;
-            max-width: 600px; /* Forces a mobile-friendly layout even on desktop */
-            margin: 0 auto;
-        }
+        .container { padding: 1rem; max-width: 600px; margin: 0 auto; }
         h2 { font-size: 1.3rem; margin-top: 0; margin-bottom: 1rem; }
 
-        /* Product List Grid (Single/Double Column optimized for mobile screens) */
         .products-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-            gap: 1rem;
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1rem;
         }
         .product-card {
-            background: white;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-            display: flex;
-            flex-direction: column;
+            background: white; border-radius: 12px; overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06); display: flex; flex-direction: column;
         }
-        .img-container {
-            position: relative;
-            width: 100%;
-            height: 160px;
-            overflow: hidden;
-        }
-        .product-img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            background-color: #e2e8f0;
-        }
+        .img-container { position: relative; width: 100%; height: 160px; overflow: hidden; }
+        .product-img { width: 100%; height: 100%; object-fit: cover; background-color: #e2e8f0; }
+        
         .status-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5); /* 50% Transparency */
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            color: white;
-            font-size: 1.2rem;
-            font-weight: bold;
-            text-transform: uppercase;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.5); display: flex; justify-content: center;
+            align-items: center; color: white; font-size: 1.2rem; font-weight: bold; text-transform: uppercase;
         }
 
-        .product-info {
-            padding: 0.8rem;
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-        }
+        .product-info { padding: 0.8rem; flex-grow: 1; display: flex; flex-direction: column; justify-content: space-between; }
         .product-code { font-size: 0.75rem; color: #64748b; text-transform: uppercase; }
         .product-title { font-size: 0.95rem; margin: 0.2rem 0; font-weight: 600; }
         .product-price { font-size: 1.1rem; color: var(--dark); font-weight: bold; margin-bottom: 0.6rem; }
@@ -116,51 +71,29 @@
         .action-buttons .btn { width: 100%; padding: 0.5rem; font-size: 0.8rem; }
 
         .admin-actions {
-            margin-top: 0.6rem;
-            border-top: 1px solid #e2e8f0;
-            padding-top: 0.6rem;
-            display: flex;
-            gap: 0.4rem;
+            margin-top: 0.6rem; border-top: 1px solid #e2e8f0; padding-top: 0.6rem; display: flex; gap: 0.4rem;
         }
         .admin-actions .btn { flex: 1; padding: 0.4rem; font-size: 0.75rem; }
 
-        /* Universal Popup Dialog / Modals */
         .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.8);
-            justify-content: center;
-            align-items: center;
-            padding: 1rem;
+            display: none; position: fixed; z-index: 1000; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.8); justify-content: center; align-items: center; padding: 1rem;
         }
         .modal-content-panel {
-            background: white;
-            width: 100%;
-            max-width: 450px;
-            border-radius: 12px;
-            padding: 1.5rem;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-            max-height: 90vh;
-            overflow-y: auto;
+            background: white; width: 100%; max-width: 450px; border-radius: 12px; padding: 1.5rem;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto;
         }
         .form-group { margin-bottom: 0.8rem; }
         .form-group label { display: block; margin-bottom: 0.3rem; font-weight: bold; font-size: 0.85rem; }
         .form-group input, .form-group select {
             width: 100%; padding: 0.6rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.9rem;
         }
-
-        /* Lightbox Image View Zoom */
-        #imageModal .modal-content-img {
-            max-width: 100%;
-            max-height: 80vh;
-            border-radius: 8px;
-        }
+        #imageModal .modal-content-img { max-width: 100%; max-height: 80vh; border-radius: 8px; }
+        .loading { text-align: center; font-weight: bold; padding: 2rem; color: #64748b; }
     </style>
+
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 </head>
 <body>
 
@@ -174,6 +107,7 @@
 
     <div class="container">
         <h2>Available Products</h2>
+        <div id="loading-indicator" class="loading">Loading products from cloud...</div>
         <div class="products-grid" id="products-container"></div>
     </div>
 
@@ -220,19 +154,49 @@
     </div>
 
     <script>
-        const defaultProducts = [
-            { id: 1710000001, code: "ITEM-01", name: "Sample Leather Wallet", price: "₹499", img: "https://images.unsplash.com/photo-1627123424574-724758594e93?w=400", status: "In Stock" },
-            { id: 1710000002, code: "ITEM-02", name: "Bluetooth Speaker", price: "₹1,250", img: "https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=400", status: "Sold" }
-        ];
+        // --- PASTE YOUR FIREBASE CREDENTIALS HERE ---
+        const firebaseConfig = {
+  apiKey: "AIzaSyAA60xkGygpG9no7Qbq3xsxpCO5hupDHPE",
+  authDomain: "my-earings-85407.firebaseapp.com",
+  databaseURL: "https://my-earings-85407-default-rtdb.firebaseio.com",
+  projectId: "my-earings-85407",
+  storageBucket: "my-earings-85407.firebasestorage.app",
+  messagingSenderId: "637254172278",
+  appId: "1:637254172278:web:33e9741e7017564a5f2957"
+};
+        // --------------------------------------------
 
-        let products = JSON.parse(localStorage.getItem('sale_products')) || defaultProducts;
+        // Initialize Firebase Connection
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        let products = [];
         let isAdmin = false;
         let uploadedImageBase64 = "";
         const WHATSAPP_NUMBER = "918778096977";
 
+        // Listen for real-time live database modifications across all users
+        database.ref('products').on('value', (snapshot) => {
+            document.getElementById('loading-indicator').style.display = 'none';
+            const data = snapshot.val();
+            products = [];
+            if (data) {
+                // Parse database object map structure into list arrays
+                Object.keys(data).forEach(key => {
+                    products.push({ dbKey: key, ...data[key] });
+                });
+            }
+            renderProducts();
+        });
+
         function renderProducts() {
             const container = document.getElementById('products-container');
             container.innerHTML = '';
+
+            if (products.length === 0) {
+                container.innerHTML = '<div class="loading">No products listed yet!</div>';
+                return;
+            }
 
             products.forEach(product => {
                 let overlayHTML = '';
@@ -249,8 +213,8 @@
                 if (isAdmin) {
                     adminButtons = `
                         <div class="admin-actions">
-                            <button class="btn btn-secondary" onclick="editProduct(${product.id})">Edit</button>
-                            <button class="btn btn-danger" onclick="deleteProduct(${product.id})">Delete</button>
+                            <button class="btn btn-secondary" onclick="editProduct('${product.dbKey}')">Edit</button>
+                            <button class="btn btn-danger" onclick="deleteProduct('${product.dbKey}')">Delete</button>
                         </div>
                     `;
                 }
@@ -280,23 +244,12 @@
             });
         }
 
-        // Popup Controllers
-        function openAdminPopup() {
-            clearForm();
-            document.getElementById('adminModal').style.display = "flex";
-        }
-        function closeAdminPopup() {
-            document.getElementById('adminModal').style.display = "none";
-        }
-        function openLightbox(imgSrc) {
-            document.getElementById('modalImg').src = imgSrc;
-            document.getElementById('imageModal').style.display = "flex";
-        }
-        function closeLightbox() {
-            document.getElementById('imageModal').style.display = "none";
-        }
+        // Window Handlers
+        function openAdminPopup() { clearForm(); document.getElementById('adminModal').style.display = "flex"; }
+        function closeAdminPopup() { document.getElementById('adminModal').style.display = "none"; }
+        function openLightbox(imgSrc) { document.getElementById('modalImg').src = imgSrc; document.getElementById('imageModal').style.display = "flex"; }
+        function closeLightbox() { document.getElementById('imageModal').style.display = "none"; }
 
-        // Authentication Core
         function toggleLogin() {
             if (isAdmin) {
                 isAdmin = false;
@@ -305,7 +258,6 @@
             } else {
                 const user = prompt("Enter Username:");
                 const pass = prompt("Enter Password:");
-
                 if (user === "admin" && pass === "admin") {
                     isAdmin = true;
                     document.getElementById('login-btn').innerText = "Logout";
@@ -327,9 +279,10 @@
             if (file) reader.readAsDataURL(file);
         }
 
+        // Cloud Database Save Operations
         function saveProduct(e) {
             e.preventDefault();
-            const id = document.getElementById('product-id').value;
+            const dbKey = document.getElementById('product-id').value;
             const name = document.getElementById('prod-name').value;
             const price = document.getElementById('prod-price').value;
             let code = document.getElementById('prod-code').value.trim();
@@ -339,22 +292,22 @@
             if (img === "Local Image Loaded") img = uploadedImageBase64;
             if (!code) code = "PRD-" + Math.floor(1000 + Math.random() * 9000);
 
-            if (id) {
-                const index = products.findIndex(p => p.id == id);
-                products[index] = { id: parseInt(id), code, name, price, img, status };
-            } else {
-                const newProd = { id: Date.now(), code, name, price, img, status };
-                products.push(newProd);
-            }
+            const productPayload = { code, name, price, img, status, updatedTime: Date.now() };
 
-            localStorage.setItem('sale_products', JSON.stringify(products));
-            renderProducts();
-            closeAdminPopup();
+            if (dbKey) {
+                // Push direct update to specific object index inside Firebase
+                database.ref('products/' + dbKey).set(productPayload)
+                    .then(() => closeAdminPopup());
+            } else {
+                // Generate a new cloud location entry structural pointer
+                database.ref('products').push(productPayload)
+                    .then(() => closeAdminPopup());
+            }
         }
 
-        function editProduct(id) {
-            const prod = products.find(p => p.id == id);
-            document.getElementById('product-id').value = prod.id;
+        function editProduct(dbKey) {
+            const prod = products.find(p => p.dbKey === dbKey);
+            document.getElementById('product-id').value = prod.dbKey;
             document.getElementById('prod-code').value = prod.code;
             document.getElementById('prod-name').value = prod.name;
             document.getElementById('prod-price').value = prod.price;
@@ -365,11 +318,9 @@
             document.getElementById('adminModal').style.display = "flex";
         }
 
-        function deleteProduct(id) {
-            if(confirm("Delete this product?")) {
-                products = products.filter(p => p.id != id);
-                localStorage.setItem('sale_products', JSON.stringify(products));
-                renderProducts();
+        function deleteProduct(dbKey) {
+            if(confirm("Delete this product from cloud storage?")) {
+                database.ref('products/' + dbKey).remove();
             }
         }
 
@@ -379,8 +330,6 @@
             document.getElementById('form-title').innerText = "Add Product";
             uploadedImageBase64 = "";
         }
-
-        renderProducts();
     </script>
 </body>
 </html>
