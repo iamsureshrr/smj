@@ -20,8 +20,6 @@ let selectedCategoryFilter = "In Stock";
 const WHATSAPP_NUMBER = "918778096977";
 
 let uploadedImagesArray = []; // Holds items structured as "thumbnailData*hdData"
-let displayLimit = 4; 
-let isScrollLoading = false;
 let currentSortState = "none"; // Options: "none", "highToLow", "lowToHigh"
 
 const urlParams = new URLSearchParams(window.location.search);
@@ -45,7 +43,6 @@ database.ref('products').on('value', (snapshot) => {
             products.push({ dbKey: key, ...data[key] });
         });
     }
-    displayLimit = 4;
     filterStore();
     if (document.getElementById('cartDrawer').style.display === "flex") {
         openCartDrawer();
@@ -53,35 +50,6 @@ database.ref('products').on('value', (snapshot) => {
 }, (error) => {
     console.error(error);
 });
-
-// Setup Automated Infinite Scroll Monitoring
-// Check if the user has scrolled to the bottom, or if the screen needs more items to fill it
-function checkInfiniteScroll() {
-    if (isScrollLoading) return;
-
-    const searchQuery = document.getElementById('search-box').value.toLowerCase().trim();
-    const filteredCount = products.filter(p => {
-        if (selectedCategoryFilter !== "All" && p.status !== selectedCategoryFilter) return false;
-        if (searchQuery && !p.name?.toLowerCase().includes(searchQuery) && !p.code?.toLowerCase().includes(searchQuery)) return false;
-        return true;
-    }).length;
-
-    // Condition A: User scrolled within 150px of the bottom edge
-    const reachedBottom = (window.innerHeight + window.scrollY) >= document.documentElement.scrollHeight - 150;
-    
-    // Condition B: The content is shorter than the screen height (no scroll bar exists yet)
-    const contentShorterThanScreen = document.documentElement.scrollHeight <= window.innerHeight + 50;
-
-    if ((reachedBottom || contentShorterThanScreen) && displayLimit < filteredCount) {
-        isScrollLoading = true;
-        displayLimit += 4;
-        filterStore();
-        setTimeout(() => { isScrollLoading = false; }, 400); // Prevent duplicate bounce triggers
-    }
-}
-
-// Attach the scroll listener
-window.addEventListener('scroll', checkInfiniteScroll);
 
 // Separates the fast preview element from high resolution source packages cleanly
 function parseProductImage(imgStr, getHD = false) {
@@ -111,7 +79,7 @@ function filterStore() {
         return searchQuery === "" || matchesName || matchesCode;
     });
 
-    // Added: Dynamic Sort Array Interceptor Pipeline
+    // Dynamic Sort Array Interceptor Pipeline
     if (currentSortState === "highToLow") {
         filtered.sort((a, b) => {
             let priceA = parseFloat(String(a.price || '0').replace(/[^0-9.]/g, '')) || 0;
@@ -124,20 +92,15 @@ function filterStore() {
             let priceB = parseFloat(String(b.price || '0').replace(/[^0-9.]/g, '')) || 0;
             return priceA - priceB;
         });
-// Auto-trigger a check right after rendering to ensure the screen is filled
-    setTimeout(checkInfiniteScroll, 100);
     }
-
-
 
     if (filtered.length === 0) {
         container.innerHTML = '<div class="loading" style="grid-column: span 2;">No products found.</div>';
         return;
     }
 
-    const itemsToRender = filtered.slice(0, displayLimit);
-
-    itemsToRender.forEach(product => {
+    // Scroll engine removed - renders all matching items instantly
+    filtered.forEach(product => {
         let overlayHTML = '';
         let displayPriceHTML = `<div class="product-price">₹${parseFloat(String(product.price || '0').replace(/[^0-9.]/g, '')) || 0}</div>`;
         let buttonHTML = '';
@@ -216,7 +179,29 @@ function selectCategory(category, element) {
     selectedCategoryFilter = category;
     document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
     element.classList.add('active');
-    displayLimit = 4;
+    filterStore();
+}
+
+function togglePriceSort() {
+    const btn = document.getElementById('sort-toggle-btn');
+    
+    if (currentSortState === "none") {
+        currentSortState = "highToLow";
+        btn.innerHTML = "Price: High ➔ Low ⬇️";
+        btn.style.backgroundColor = "var(--primary)";
+        btn.style.color = "white";
+    } else if (currentSortState === "highToLow") {
+        currentSortState = "lowToHigh";
+        btn.innerHTML = "Price: Low ➔ High ⬆️";
+        btn.style.backgroundColor = "var(--primary)";
+        btn.style.color = "white";
+    } else {
+        currentSortState = "none";
+        btn.innerHTML = "Sort Price ↕️";
+        btn.style.backgroundColor = "#e2e8f0";
+        btn.style.color = "#475569";
+    }
+    
     filterStore();
 }
 
@@ -351,6 +336,10 @@ function openDetailsModal(dbKey) {
     const hdImages = parseProductImage(prod.img, true);
     const mainImgNode = document.getElementById('details-main-img');
     mainImgNode.src = hdImages[0];
+    
+    // Configures details modal image view to interact with lightbox zoom overlay
+    mainImgNode.style.cursor = "zoom-in";
+    mainImgNode.onclick = function() { openLightbox(this.src); };
 
     const thumbsContainer = document.getElementById('details-thumbs');
     thumbsContainer.innerHTML = '';
@@ -373,6 +362,23 @@ function switchDetailsHDImage(url, element) {
 function closeDetailsModal(event) { 
     if (!event || event.target === document.getElementById('detailsModal') || event.target.tagName === 'BUTTON') {
         document.getElementById('detailsModal').style.display = "none"; 
+    }
+}
+
+// Full-Screen Interactive Lightbox Controls
+function openLightbox(imageSrc) {
+    const lightbox = document.getElementById('lightboxOverlay');
+    const lightboxImg = document.getElementById('lightbox-img');
+    
+    lightboxImg.src = imageSrc;
+    lightbox.style.display = "flex";
+    document.body.style.overflow = "hidden"; // Prevent background layer crawl
+}
+
+function closeLightbox(event) {
+    if (!event || event.target === document.getElementById('lightboxOverlay') || event.target.classList.contains('lightbox-close-btn')) {
+        document.getElementById('lightboxOverlay').style.display = "none";
+        document.body.style.overflow = "auto";
     }
 }
 
@@ -470,7 +476,7 @@ function saveProduct(e) {
     const userPass = prompt("Enter Password:");
     if (!userPass) return;
 
-const imgPayloadString = uploadedImagesArray.join('|');
+    const imgPayloadString = uploadedImagesArray.join('|');
     const productPayload = { code, name, price, mrp, stock, description, img: imgPayloadString, status, updatedTime: Date.now() };
 
     database.ref('admin_pass').once('value').then((snapshot) => {
@@ -525,33 +531,14 @@ function clearForm() {
     uploadedImagesArray = [];
     document.getElementById('admin-preview-wrapper').innerHTML = '';
 }
-function togglePriceSort() {
+
+// Fallback listener initialization for the sort toggle label setup
+document.addEventListener("DOMContentLoaded", () => {
     const btn = document.getElementById('sort-toggle-btn');
-    
-    if (currentSortState === "none") {
-        currentSortState = "highToLow";
-        btn.innerHTML = "Price: High ➔ Low ⬇️";
-        btn.style.backgroundColor = "var(--primary)";
-        btn.style.color = "white";
-    } else if (currentSortState === "highToLow") {
-        currentSortState = "lowToHigh";
-        btn.innerHTML = "Price: Low ➔ High ⬆️";
-        btn.style.backgroundColor = "var(--primary)";
-        btn.style.color = "white";
-    } else {
-        currentSortState = "none";
+    if (btn) {
         btn.innerHTML = "Sort Price ↕️";
         btn.style.backgroundColor = "#e2e8f0";
         btn.style.color = "#475569";
     }
-    
-    displayLimit = 4; // reset pagination viewport limit
-    filterStore();
-}
-
-// Initialize the sort button baseline text safely when the DOM loads or script boots up
-document.addEventListener("DOMContentLoaded", () => {
-    const btn = document.getElementById('sort-toggle-btn');
-    if(btn) btn.innerHTML = "Sort Price ↕️";
 });
 
