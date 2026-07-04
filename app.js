@@ -43,7 +43,7 @@ database.ref('products').on('value', (snapshot) => {
             products.push({ dbKey: key, ...data[key] });
         });
     }
-    filterStore();
+    filterStore(); // Directly trigger full display update
     if (document.getElementById('cartDrawer').style.display === "flex") {
         openCartDrawer();
     }
@@ -99,7 +99,7 @@ function filterStore() {
         return;
     }
 
-    // Scroll engine removed - renders all matching items instantly
+    // Loops and mounts every single matched inventory data record systematically
     filtered.forEach(product => {
         let overlayHTML = '';
         let displayPriceHTML = `<div class="product-price">₹${parseFloat(String(product.price || '0').replace(/[^0-9.]/g, '')) || 0}</div>`;
