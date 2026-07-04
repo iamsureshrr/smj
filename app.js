@@ -55,25 +55,33 @@ database.ref('products').on('value', (snapshot) => {
 });
 
 // Setup Automated Infinite Scroll Monitoring
-window.addEventListener('scroll', () => {
+// Check if the user has scrolled to the bottom, or if the screen needs more items to fill it
+function checkInfiniteScroll() {
     if (isScrollLoading) return;
-    
-    if ((window.innerHeight + window.scrollY) >= document.documentElement.scrollHeight - 150) {
-        const searchQuery = document.getElementById('search-box').value.toLowerCase().trim();
-        const filteredCount = products.filter(p => {
-            if (selectedCategoryFilter !== "All" && p.status !== selectedCategoryFilter) return false;
-            if (searchQuery && !p.name?.toLowerCase().includes(searchQuery) && !p.code?.toLowerCase().includes(searchQuery)) return false;
-            return true;
-        }).length;
 
-        if (displayLimit < filteredCount) {
-            isScrollLoading = true;
-            displayLimit += 4;
-            filterStore();
-            setTimeout(() => { isScrollLoading = false; }, 400); 
-        }
+    const searchQuery = document.getElementById('search-box').value.toLowerCase().trim();
+    const filteredCount = products.filter(p => {
+        if (selectedCategoryFilter !== "All" && p.status !== selectedCategoryFilter) return false;
+        if (searchQuery && !p.name?.toLowerCase().includes(searchQuery) && !p.code?.toLowerCase().includes(searchQuery)) return false;
+        return true;
+    }).length;
+
+    // Condition A: User scrolled within 150px of the bottom edge
+    const reachedBottom = (window.innerHeight + window.scrollY) >= document.documentElement.scrollHeight - 150;
+    
+    // Condition B: The content is shorter than the screen height (no scroll bar exists yet)
+    const contentShorterThanScreen = document.documentElement.scrollHeight <= window.innerHeight + 50;
+
+    if ((reachedBottom || contentShorterThanScreen) && displayLimit < filteredCount) {
+        isScrollLoading = true;
+        displayLimit += 4;
+        filterStore();
+        setTimeout(() => { isScrollLoading = false; }, 400); // Prevent duplicate bounce triggers
     }
-});
+}
+
+// Attach the scroll listener
+window.addEventListener('scroll', checkInfiniteScroll);
 
 // Separates the fast preview element from high resolution source packages cleanly
 function parseProductImage(imgStr, getHD = false) {
@@ -116,6 +124,8 @@ function filterStore() {
             let priceB = parseFloat(String(b.price || '0').replace(/[^0-9.]/g, '')) || 0;
             return priceA - priceB;
         });
+// Auto-trigger a check right after rendering to ensure the screen is filled
+    setTimeout(checkInfiniteScroll, 100);
     }
 
 
