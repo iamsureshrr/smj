@@ -46,6 +46,9 @@ database.ref('products').on('value', (snapshot) => {
     }
     displayLimit = 4;
     filterStore();
+    if (document.getElementById('cartDrawer').style.display === "flex") {
+        openCartDrawer();
+    }
 }, (error) => {
     console.error(error);
 });
@@ -54,7 +57,6 @@ database.ref('products').on('value', (snapshot) => {
 window.addEventListener('scroll', () => {
     if (isScrollLoading) return;
     
-    // Trigger window load boundary when user scrolls within 150px of the bottom edge
     if ((window.innerHeight + window.scrollY) >= document.documentElement.scrollHeight - 150) {
         const searchQuery = document.getElementById('search-box').value.toLowerCase().trim();
         const filteredCount = products.filter(p => {
@@ -67,7 +69,7 @@ window.addEventListener('scroll', () => {
             isScrollLoading = true;
             displayLimit += 4;
             filterStore();
-            setTimeout(() => { isScrollLoading = false; }, 400); // Prevent duplicate bounce triggers
+            setTimeout(() => { isScrollLoading = false; }, 400); 
         }
     }
 });
@@ -83,7 +85,7 @@ function parseProductImage(imgStr, getHD = false) {
             let parts = entry.split('*');
             return getHD ? parts[1] : parts[0]; 
         }
-        return entry; // Fallback structure handling for historical rows
+        return entry; 
     }).filter(str => str && str.length > 15);
 }
 
@@ -128,10 +130,10 @@ function filterStore() {
         const currentQty = shoppingCart[product.dbKey] || 0;
         if (currentQty > 0) {
             buttonHTML = `
-                <div class="inline-qty-selector">
-                    <button class="btn-qty" onclick="event.stopPropagation(); changeQty('${product.dbKey}', -1)">-</button>
+                <div class="inline-qty-selector" onclick="event.stopPropagation();">
+                    <button class="btn-qty" onclick="changeQty('${product.dbKey}', -1)">-</button>
                     <span>${currentQty}</span>
-                    <button class="btn-qty" onclick="event.stopPropagation(); changeQty('${product.dbKey}', 1)">+</button>
+                    <button class="btn-qty" onclick="changeQty('${product.dbKey}', 1)">+</button>
                 </div>`;
         } else {
             buttonHTML = `<button class="btn btn-primary" onclick="event.stopPropagation(); addToCart('${product.dbKey}')">Add to Cart</button>`;
@@ -155,7 +157,6 @@ function filterStore() {
                 <button class="btn btn-danger" onclick="event.stopPropagation(); deleteProduct('${product.dbKey}')">Delete</button>
             </div>` : '';
 
-        // Load Fast Preview Thumbnail for grid overview
         const thumbnails = parseProductImage(product.img, false);
         const firstThumb = thumbnails[0];
 
@@ -202,6 +203,9 @@ function changeQty(dbKey, delta) {
     else if (targetQty > 10) return;
     else shoppingCart[dbKey] = targetQty;
     updateCartUI(); filterStore();
+    if (document.getElementById('cartDrawer').style.display === "flex") {
+        openCartDrawer();
+    }
 }
 
 function updateCartUI() {
@@ -219,6 +223,88 @@ function updateCartUI() {
     });
     document.getElementById('cart-count').innerText = totalItems;
     document.getElementById('cart-total-price').innerText = "₹" + totalPrice;
+    document.getElementById('drawer-total-price').innerText = "₹" + totalPrice;
+}
+
+// Drawer Visibility Controls
+function openCartDrawer() {
+    const drawer = document.getElementById('cartDrawer');
+    const container = document.getElementById('cart-items-container');
+    container.innerHTML = '';
+    
+    let grandTotal = 0;
+    const uniqueKeys = Object.keys(shoppingCart);
+    
+    if (uniqueKeys.length === 0) {
+        container.innerHTML = '<div class="loading">Your bag is empty.</div>';
+    } else {
+        uniqueKeys.forEach(key => {
+            const prod = products.find(p => p.dbKey === key);
+            if (prod) {
+                const qty = shoppingCart[key];
+                const price = parseFloat(String(prod.price || '0').replace(/[^0-9.]/g, '')) || 0;
+                const itemTotal = price * qty;
+                grandTotal += itemTotal;
+                
+                container.innerHTML += `
+                    <div class="cart-item">
+                        <div class="cart-item-details">
+                            <span class="cart-item-name">${prod.name || ''}</span>
+                            <span class="cart-item-code">${prod.code || ''}</span>
+                            <span style="font-size:0.8rem; color:var(--primary); font-weight:bold;">₹${price} each</span>
+                        </div>
+                        <div class="qty-controls">
+                            <button class="btn-qty" onclick="changeQty('${key}', -1)">-</button>
+                            <span style="font-weight:bold; min-width:20px; text-align:center;">${qty}</span>
+                            <button class="btn-qty" onclick="changeQty('${key}', 1)">+</button>
+                            <span style="font-weight:bold; margin-left:0.5rem; min-width:60px; text-align:right;">₹${itemTotal}</span>
+                        </div>
+                    </div>`;
+            }
+        });
+    }
+    
+    document.getElementById('drawer-total-price').innerText = "₹" + grandTotal;
+    drawer.style.display = "flex";
+}
+
+function closeCartDrawer(event) {
+    if (!event || event.target === document.getElementById('cartDrawer') || event.target.tagName === 'BUTTON') {
+        document.getElementById('cartDrawer').style.display = "none";
+    }
+}
+
+// WhatsApp Link Generator Pipeline
+function checkoutToWhatsApp() {
+    const uniqueKeys = Object.keys(shoppingCart);
+    if (uniqueKeys.length === 0) return;
+    
+    let message = "*New Order Details - Jeevan Jewellery*\n\n";
+    let grandTotal = 0;
+    
+    uniqueKeys.forEach((key, index) => {
+        const prod = products.find(p => p.dbKey === key);
+        if (prod) {
+            const qty = shoppingCart[key];
+            const price = parseFloat(String(prod.price || '0').replace(/[^0-9.]/g, '')) || 0;
+            const subtotal = price * qty;
+            grandTotal += subtotal;
+            message += `${index + 1}. *${prod.name}* (${prod.code || 'N/A'})\n`;
+            message += `   Qty: ${qty} x ₹${price} = *₹${subtotal}*\n\n`;
+        }
+    });
+    
+    message += `---------------------------\n`;
+    message += `*Grand Total: ₹${grandTotal}*`;
+    
+    const encodedMessage = encodeURIComponent(message);
+    window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodedMessage}`, '_blank');
+}
+
+// Input filter to sanitize non-numerical inputs for Admin Prices
+function formatCurrencyInput(input) {
+    let value = input.value.replace(/[^0-9]/g, '');
+    input.value = value ? '₹' + value : '';
 }
 
 // Open modal and load lossless HD images
@@ -233,7 +319,6 @@ function openDetailsModal(dbKey) {
     let cleanPrice = parseFloat(String(prod.price || '0').replace(/[^0-9.]/g, '')) || 0;
     document.getElementById('details-price-block').innerHTML = `<span style="font-size:1.4rem; font-weight:bold;">₹${cleanPrice}</span>`;
 
-    // Fetch the Lossless High Definition file for presentation views
     const hdImages = parseProductImage(prod.img, true);
     const mainImgNode = document.getElementById('details-main-img');
     mainImgNode.src = hdImages[0];
@@ -256,9 +341,13 @@ function switchDetailsHDImage(url, element) {
     element.classList.add('active');
 }
 
-function closeDetailsModal() { document.getElementById('detailsModal').style.display = "none"; }
+function closeDetailsModal(event) { 
+    if (!event || event.target === document.getElementById('detailsModal') || event.target.tagName === 'BUTTON') {
+        document.getElementById('detailsModal').style.display = "none"; 
+    }
+}
 
-// Double Image Compression Pipeline (Saves preview and high quality files together)
+// Double Image Compression Pipeline
 function handleImageUpload(event) {
     const files = event.target.files;
     if (!files) return;
@@ -268,17 +357,15 @@ function handleImageUpload(event) {
         reader.onload = function(e) {
             const img = new Image();
             img.onload = function() {
-                // 1. Build Lossless Web-Optimized Quality Image
                 const canvasHD = document.createElement('canvas');
                 const ctxHD = canvasHD.getContext('2d');
-                const MAX_HD_WIDTH = 1200; // Large detailed viewport target boundary
+                const MAX_HD_WIDTH = 1200; 
                 let wHD = img.width; let hHD = img.height;
                 if (wHD > MAX_HD_WIDTH) { hHD = Math.round((hHD * MAX_HD_WIDTH) / wHD); wHD = MAX_HD_WIDTH; }
                 canvasHD.width = wHD; canvasHD.height = hHD;
                 ctxHD.drawImage(img, 0, 0, wHD, hHD);
-                const hdBase64 = canvasHD.toDataURL('image/jpeg', 0.92); // Crystal clear lossless render quality
+                const hdBase64 = canvasHD.toDataURL('image/jpeg', 0.92);
 
-                // 2. Build Fast Grid Preview Thumbnail File
                 const canvasThumb = document.createElement('canvas');
                 const ctxThumb = canvasThumb.getContext('2d');
                 const MAX_THUMB_WIDTH = 320; 
@@ -286,9 +373,8 @@ function handleImageUpload(event) {
                 if (wT > MAX_THUMB_WIDTH) { hT = Math.round((hT * MAX_THUMB_WIDTH) / wT); wT = MAX_THUMB_WIDTH; }
                 canvasThumb.width = wT; canvasThumb.height = hT;
                 ctxThumb.drawImage(img, 0, 0, wT, hT);
-                const thumbBase64 = canvasThumb.toDataURL('image/jpeg', 0.5); // Accelerated lightweight rendering cache
+                const thumbBase64 = canvasThumb.toDataURL('image/jpeg', 0.5);
 
-                // Bundle data parameters safely using the clear asterisk character *
                 uploadedImagesArray.push(thumbBase64 + '*' + hdBase64);
                 renderAdminPreviews();
             };
@@ -319,7 +405,6 @@ function renderAdminPreviews() {
 
     uploadedImagesArray.forEach((combinedString, index) => {
         const isMain = index === 0;
-        // Read thumbnail for admin preview window rendering speed
         const displayImg = combinedString.includes('*') ? combinedString.split('*')[0] : combinedString;
 
         const badgeHTML = isMain 
@@ -356,7 +441,7 @@ function saveProduct(e) {
     const userPass = prompt("Enter Password:");
     if (!userPass) return;
 
-    const imgPayloadString = uploadedImagesArray.join('|');
+const imgPayloadString = uploadedImagesArray.join('|');
     const productPayload = { code, name, price, mrp, stock, description, img: imgPayloadString, status, updatedTime: Date.now() };
 
     database.ref('admin_pass').once('value').then((snapshot) => {
@@ -383,7 +468,6 @@ function editProduct(dbKey) {
     document.getElementById('prod-desc').value = prod.description || '';
     document.getElementById('prod-status').value = prod.status;
     
-    // Read historical content structures safely 
     if (prod.img && !prod.img.includes('*') && prod.img.length > 50) {
         let oldImages = prod.img.split(prod.img.includes('|') ? '|' : ',');
         uploadedImagesArray = oldImages.map(img => img.trim() + '*' + img.trim());
@@ -412,4 +496,3 @@ function clearForm() {
     uploadedImagesArray = [];
     document.getElementById('admin-preview-wrapper').innerHTML = '';
 }
-
