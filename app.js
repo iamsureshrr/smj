@@ -17,9 +17,10 @@ let products = [];
 let shoppingCart = {}; 
 let isAdmin = false;
 let selectedCategoryFilter = "In Stock"; 
+let currentSortRule = "default"; // "default" or "price-low-high"
 const WHATSAPP_NUMBER = "918778096977";
 
-let uploadedImagesArray = []; // Holds items structured as "thumbnailData*hdData"
+let uploadedImagesArray = []; 
 let displayLimit = 4; 
 let isScrollLoading = false;
 
@@ -34,7 +35,6 @@ if (urlParams.get('manage') === 'true') {
     document.getElementById('chip-InStock').classList.add('active');
 }
 
-// Fetch database records
 database.ref('products').on('value', (snapshot) => {
     document.getElementById('loading-indicator').style.display = 'none';
     const data = snapshot.val();
@@ -50,11 +50,9 @@ database.ref('products').on('value', (snapshot) => {
     console.error(error);
 });
 
-// Setup Automated Infinite Scroll Monitoring
+// Automated Infinite Scroll Engine
 window.addEventListener('scroll', () => {
     if (isScrollLoading) return;
-    
-    // Trigger window load boundary when user scrolls within 150px of the bottom edge
     if ((window.innerHeight + window.scrollY) >= document.documentElement.scrollHeight - 150) {
         const searchQuery = document.getElementById('search-box').value.toLowerCase().trim();
         const filteredCount = products.filter(p => {
@@ -67,12 +65,11 @@ window.addEventListener('scroll', () => {
             isScrollLoading = true;
             displayLimit += 4;
             filterStore();
-            setTimeout(() => { isScrollLoading = false; }, 400); // Prevent duplicate bounce triggers
+            setTimeout(() => { isScrollLoading = false; }, 400);
         }
     }
 });
 
-// Separates the fast preview element from high resolution source packages cleanly
 function parseProductImage(imgStr, getHD = false) {
     const fallback = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='none' stroke='%23cbd5e1' stroke-width='2'><rect x='3' y='3' width='18' height='18' rx='2'/><circle cx='8.5' cy='8.5' r='1.5'/><path d='M21 15l-5-5L5 21'/></svg>";
     if (!imgStr || imgStr === "Local Image Loaded" || String(imgStr).trim() === "") return [fallback];
@@ -81,22 +78,38 @@ function parseProductImage(imgStr, getHD = false) {
     return items.map(entry => {
         if (entry.includes('*')) {
             let parts = entry.split('*');
-            return getHD ? parts[1] : parts[0]; 
+            return getHD ? parts[1] : parts[ Part0]; 
         }
-        return entry; // Fallback structure handling for historical rows
+        return entry;
     }).filter(str => str && str.length > 15);
 }
 
+// Reordering & Sorting Logic
 function filterStore() {
     const searchQuery = document.getElementById('search-box').value.toLowerCase().trim();
     const container = document.getElementById('products-container');
     container.innerHTML = '';
 
-    const filtered = products.filter(p => {
+    // 1. Filter out parameters
+    let filtered = products.filter(p => {
         if (selectedCategoryFilter !== "All" && p.status !== selectedCategoryFilter) return false;
         const matchesName = p.name ? p.name.toLowerCase().includes(searchQuery) : false;
         const matchesCode = p.code ? p.code.toLowerCase().includes(searchQuery) : false;
         return searchQuery === "" || matchesName || matchesCode;
+    });
+
+    // 2. Multi-Tier Sort Execution
+    filtered.sort((a, b) => {
+        if (currentSortRule === "price-low-high") {
+            let priceA = parseFloat(String(a.price || '0').replace(/[^0-9.]/g, '')) || 0;
+            let priceB = parseFloat(String(b.price || '0').replace(/[^0-9.]/g, '')) || 0;
+            return priceA - priceB;
+        } else {
+            // Default Arrangement: Sort by Admin Custom Weight Number
+            let orderA = parseInt(a.sortOrder) || 9999;
+            let orderB = parseInt(b.sortOrder) || 9999;
+            return orderA - orderB;
+        }
     });
 
     if (filtered.length === 0) {
@@ -155,14 +168,11 @@ function filterStore() {
                 <button class="btn btn-danger" onclick="event.stopPropagation(); deleteProduct('${product.dbKey}')">Delete</button>
             </div>` : '';
 
-        // Load Fast Preview Thumbnail for grid overview
         const thumbnails = parseProductImage(product.img, false);
-        const firstThumb = thumbnails[0];
-
         container.innerHTML += `
             <div class="product-card" onclick="openDetailsModal('${product.dbKey}')">
                 <div class="img-container">
-                    <img src="${firstThumb}" class="product-img" loading="lazy" alt="Product Image">
+                    <img src="${thumbnails[0]}" class="product-img" loading="lazy" alt="Product Image">
                     ${discountBadgeHTML}
                     ${stockCountHTML}
                     ${overlayHTML}
@@ -180,6 +190,13 @@ function filterStore() {
                 </div>
             </div>`;
     });
+}
+
+function togglePriceSort(rule) {
+    currentSortRule = rule;
+    document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+    filterStore();
 }
 
 function selectCategory(category, element) {
@@ -221,7 +238,6 @@ function updateCartUI() {
     document.getElementById('cart-total-price').innerText = "₹" + totalPrice;
 }
 
-// Open modal and load lossless HD images
 function openDetailsModal(dbKey) {
     const prod = products.find(p => p.dbKey === dbKey);
     if (!prod) return;
@@ -233,10 +249,12 @@ function openDetailsModal(dbKey) {
     let cleanPrice = parseFloat(String(prod.price || '0').replace(/[^0-9.]/g, '')) || 0;
     document.getElementById('details-price-block').innerHTML = `<span style="font-size:1.4rem; font-weight:bold;">₹${cleanPrice}</span>`;
 
-    // Fetch the Lossless High Definition file for presentation views
     const hdImages = parseProductImage(prod.img, true);
     const mainImgNode = document.getElementById('details-main-img');
     mainImgNode.src = hdImages[0];
+
+    // Connect lossless transparent backdrop handler
+    mainImgNode.onclick = function() { openLosslessLightbox(mainImgNode.src); };
 
     const thumbsContainer = document.getElementById('details-thumbs');
     thumbsContainer.innerHTML = '';
@@ -251,14 +269,30 @@ function openDetailsModal(dbKey) {
 }
 
 function switchDetailsHDImage(url, element) {
-    document.getElementById('details-main-img').src = url;
+    const mainImgNode = document.getElementById('details-main-img');
+    mainImgNode.src = url;
+    mainImgNode.onclick = function() { openLosslessLightbox(url); };
     document.querySelectorAll('.thumb-img').forEach(t => t.classList.remove('active'));
     element.classList.add('active');
 }
 
 function closeDetailsModal() { document.getElementById('detailsModal').style.display = "none"; }
 
-// Double Image Compression Pipeline (Saves preview and high quality files together)
+// Lossless Black Translucent Fullscreen Lightbox Engine
+function openLosslessLightbox(src) {
+    let box = document.getElementById('lossless-lightbox');
+    if(!box) {
+        box = document.createElement('div');
+        box.id = 'lossless-lightbox';
+        box.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:10000; display:none; justify-content:center; align-items:center; cursor:zoom-out;";
+        box.innerHTML = `<img id="lightbox-img" src="" style="max-width:95%; max-height:95%; object-fit:contain; border-radius:4px; box-shadow:0 10px 25px rgba(0,0,0,0.5);">`;
+        box.onclick = function() { box.style.display = 'none'; };
+        document.body.appendChild(box);
+    }
+    document.getElementById('lightbox-img').src = src;
+    box.style.display = 'flex';
+}
+
 function handleImageUpload(event) {
     const files = event.target.files;
     if (!files) return;
@@ -268,17 +302,15 @@ function handleImageUpload(event) {
         reader.onload = function(e) {
             const img = new Image();
             img.onload = function() {
-                // 1. Build Lossless Web-Optimized Quality Image
                 const canvasHD = document.createElement('canvas');
                 const ctxHD = canvasHD.getContext('2d');
-                const MAX_HD_WIDTH = 1200; // Large detailed viewport target boundary
+                const MAX_HD_WIDTH = 1200;
                 let wHD = img.width; let hHD = img.height;
                 if (wHD > MAX_HD_WIDTH) { hHD = Math.round((hHD * MAX_HD_WIDTH) / wHD); wHD = MAX_HD_WIDTH; }
                 canvasHD.width = wHD; canvasHD.height = hHD;
                 ctxHD.drawImage(img, 0, 0, wHD, hHD);
-                const hdBase64 = canvasHD.toDataURL('image/jpeg', 0.92); // Crystal clear lossless render quality
+                const hdBase64 = canvasHD.toDataURL('image/jpeg', 0.95); // High quality for details view
 
-                // 2. Build Fast Grid Preview Thumbnail File
                 const canvasThumb = document.createElement('canvas');
                 const ctxThumb = canvasThumb.getContext('2d');
                 const MAX_THUMB_WIDTH = 320; 
@@ -286,9 +318,8 @@ function handleImageUpload(event) {
                 if (wT > MAX_THUMB_WIDTH) { hT = Math.round((hT * MAX_THUMB_WIDTH) / wT); wT = MAX_THUMB_WIDTH; }
                 canvasThumb.width = wT; canvasThumb.height = hT;
                 ctxThumb.drawImage(img, 0, 0, wT, hT);
-                const thumbBase64 = canvasThumb.toDataURL('image/jpeg', 0.5); // Accelerated lightweight rendering cache
+                const thumbBase64 = canvasThumb.toDataURL('image/jpeg', 0.6);
 
-                // Bundle data parameters safely using the clear asterisk character *
                 uploadedImagesArray.push(thumbBase64 + '*' + hdBase64);
                 renderAdminPreviews();
             };
@@ -314,22 +345,19 @@ function makePrimaryImage(index) {
 function renderAdminPreviews() {
     const wrapper = document.getElementById('admin-preview-wrapper');
     wrapper.innerHTML = '';
-    
     uploadedImagesArray = uploadedImagesArray.filter(img => img && img.trim().length > 15);
 
     uploadedImagesArray.forEach((combinedString, index) => {
         const isMain = index === 0;
-        // Read thumbnail for admin preview window rendering speed
         const displayImg = combinedString.includes('*') ? combinedString.split('*')[0] : combinedString;
-
         const badgeHTML = isMain 
-            ? `<span class="main-badge-indicator" style="position:absolute; bottom:2px; left:2px; font-size:10px; background:rgba(22,163,74,0.9); color:white; padding:2px 4px; border-radius:3px;">Main Card Cover</span>`
-            : `<span class="set-main-star-btn" onclick="makePrimaryImage(${index})" style="position:absolute; bottom:2px; left:2px; font-size:14px; background:rgba(255,255,255,0.9); cursor:pointer; padding:1px 4px; border-radius:3px; border:1px solid #ccc;">⭐ Set Main</span>`;
+            ? `<span style="position:absolute; bottom:2px; left:2px; font-size:10px; background:#16a34a; color:white; padding:2px 4px; border-radius:3px;">Main Cover</span>`
+            : `<span onclick="makePrimaryImage(${index})" style="position:absolute; bottom:2px; left:2px; font-size:11px; background:#fff; cursor:pointer; padding:1px 4px; border-radius:3px; border:1px solid #ccc;">⭐ Set Main</span>`;
 
         wrapper.innerHTML += `
-            <div class="thumb-preview-container" style="position:relative; display:inline-block; margin:5px; border:${isMain ? '2px solid #16a34a' : '1px solid #ccc'}; border-radius:4px; padding:2px;">
-                <img src="${displayImg}" style="width:75px; height:75px; object-fit:cover;">
-                <span class="remove-thumb-btn" onclick="removePreviewImage(${index})" style="position:absolute; top:2px; right:2px; background:rgba(220,38,38,0.8); color:white; border-radius:50%; width:16px; height:16px; text-align:center; font-size:11px; line-height:16px; cursor:pointer;">✕</span>
+            <div class="thumb-preview-container" style="position:relative; display:inline-block; margin:5px; border:${isMain ? '2px solid #16a34a' : '1px solid #ccc'}; padding:2px;">
+                <img src="${displayImg}" style="width:70px; height:70px; object-fit:cover;">
+                <span onclick="removePreviewImage(${index})" style="position:absolute; top:2px; right:2px; background:#dc2626; color:white; border-radius:50%; width:16px; height:16px; text-align:center; font-size:11px; cursor:pointer;">✕</span>
                 ${badgeHTML}
             </div>`;
     });
@@ -348,6 +376,7 @@ function saveProduct(e) {
     const description = document.getElementById('prod-desc').value || "";
     let code = document.getElementById('prod-code').value.trim();
     const status = document.getElementById('prod-status').value;
+    const sortOrder = document.getElementById('prod-sortorder').value || "999"; 
 
     uploadedImagesArray = uploadedImagesArray.filter(img => img && img.trim().length > 15);
     if (uploadedImagesArray.length === 0) { alert("Please add an image."); return; }
@@ -357,7 +386,7 @@ function saveProduct(e) {
     if (!userPass) return;
 
     const imgPayloadString = uploadedImagesArray.join('|');
-    const productPayload = { code, name, price, mrp, stock, description, img: imgPayloadString, status, updatedTime: Date.now() };
+    const productPayload = { code, name, price, mrp, stock, description, img: imgPayloadString, status, sortOrder: parseInt(sortOrder), updatedTime: Date.now() };
 
     database.ref('admin_pass').once('value').then((snapshot) => {
         if (snapshot.val() === userPass) {
@@ -382,8 +411,8 @@ function editProduct(dbKey) {
     document.getElementById('prod-stock').value = prod.stock || "1";
     document.getElementById('prod-desc').value = prod.description || '';
     document.getElementById('prod-status').value = prod.status;
+    document.getElementById('prod-sortorder').value = prod.sortOrder || "999";
     
-    // Read historical content structures safely 
     if (prod.img && !prod.img.includes('*') && prod.img.length > 50) {
         let oldImages = prod.img.split(prod.img.includes('|') ? '|' : ',');
         uploadedImagesArray = oldImages.map(img => img.trim() + '*' + img.trim());
