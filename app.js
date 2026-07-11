@@ -1,4 +1,4 @@
-﻿// --- FIREBASE LIVE ENVIRONMENT CONFIGURATION ---
+// --- FIREBASE LIVE ENVIRONMENT CONFIGURATION ---
 const firebaseConfig = {
   apiKey: "AIzaSyAA60xkGygpG9no7Qbq3xsxpCO5hupDHPE",
   authDomain: "my-earings-85407.firebaseapp.com",
@@ -538,7 +538,7 @@ function filterStore() {
     // Loops and mounts every single matched inventory data record systematically
     filtered.forEach(product => {
         let overlayHTML = '';
-        let displayPriceHTML = `<div class="product-price">₹${parseFloat(String(product.price || '0').replace(/[^0-9.]/g, '')) || 0}</div>`;
+        let displayPriceHTML = `<div class="product-price">&#8377;${parseFloat(String(product.price || '0').replace(/[^0-9.]/g, '')) || 0}</div>`;
         let buttonHTML = '';
         let discountBadgeHTML = '';
 
@@ -548,7 +548,7 @@ function filterStore() {
             if (numMRP > numPrice) {
                 let pct = Math.round(((numMRP - numPrice) / numMRP) * 100);
                 if (pct > 0) discountBadgeHTML = `<div class="discount-badge">${pct}% OFF</div>`;
-                displayPriceHTML = `<div class="product-price">₹${numPrice}</div><div class="product-mrp-crossed">₹${numMRP}</div>`;
+                displayPriceHTML = `<div class="product-price">&#8377;${numPrice}</div><div class="product-mrp-crossed">&#8377;${numMRP}</div>`;
             }
         }
 
@@ -849,7 +849,7 @@ function renderAdminPreviews() {
         wrapper.innerHTML += `
             <div class="thumb-preview-container" style="position:relative; display:inline-block; margin:5px; border:${isMain ? '2px solid #16a34a' : '1px solid #ccc'}; border-radius:4px; padding:2px;">
                 <img src="${displayImg}" style="width:75px; height:75px; object-fit:cover;">
-                <span class="remove-thumb-btn" onclick="removePreviewImage(${index})" style="position:absolute; top:2px; right:2px; background:rgba(220,38,38,0.8); color:white; border-radius:50%; width:16px; height:16px; text-align:center; font-size:11px; line-height:16px; cursor:pointer;">x</span>
+                <button class="remove-thumb-btn" type="button" aria-label="Remove image" onclick="removePreviewImage(${index})">&times;</button>
                 ${badgeHTML}
                 <div class="display-order-controls">
                     <button type="button" onclick="movePreviewImage(${index}, -1)">Left</button>

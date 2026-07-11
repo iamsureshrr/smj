@@ -1,4 +1,4 @@
-﻿:root {
+:root {
     --primary: #2563eb;
     --success: #22c55e;
     --dark: #1e293b;
@@ -182,8 +182,8 @@ header h1 {
 }
 .remove-thumb-btn {
     position: absolute;
-    top: -4px;
-    right: -4px;
+    top: -7px;
+    right: -7px;
     background: #dc2626;
     color: white;
     font-size: 0.6rem;
@@ -196,6 +196,10 @@ header h1 {
     justify-content: center;
     cursor: pointer;
     box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    border: 0;
+    padding: 0;
+    line-height: 1;
+    z-index: 5;
 }
 .form-group { margin-bottom: 0.8rem; }
 .form-group label { display: block; margin-bottom: 0.2rem; font-weight: bold; font-size: 0.8rem; }
